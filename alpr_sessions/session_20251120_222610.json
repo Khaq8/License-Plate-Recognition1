@@ -1,0 +1,37 @@
+{
+  "session_id": "20251120_222610",
+  "session_start": "2025-11-20T22:26:14.281456",
+  "total_detections": 5,
+  "detections": [
+    {
+      "timestamp": "2025-11-20T22:26:14.281456",
+      "plate": "107777",
+      "ocr_confidence": 0.2907,
+      "detection_confidence": 0.779
+    },
+    {
+      "timestamp": "2025-11-20T22:26:16.718086",
+      "plate": "202004",
+      "ocr_confidence": 0.8042,
+      "detection_confidence": 0.8985
+    },
+    {
+      "timestamp": "2025-11-20T22:26:18.408080",
+      "plate": "9010148",
+      "ocr_confidence": 0.9622,
+      "detection_confidence": 0.8988
+    },
+    {
+      "timestamp": "2025-11-20T22:26:20.823850",
+      "plate": "P01014",
+      "ocr_confidence": 0.9094,
+      "detection_confidence": 0.8361
+    },
+    {
+      "timestamp": "2025-11-20T22:26:24.550550",
+      "plate": "9010148",
+      "ocr_confidence": 0.9906,
+      "detection_confidence": 0.8432
+    }
+  ]
+}

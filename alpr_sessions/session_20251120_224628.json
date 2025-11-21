@@ -1,0 +1,49 @@
+{
+  "session_id": "20251120_224628",
+  "session_start": "2025-11-20T22:46:35.666173",
+  "total_detections": 7,
+  "detections": [
+    {
+      "timestamp": "2025-11-20T22:46:35.666173",
+      "plate": "C66660",
+      "ocr_confidence": 0.2239,
+      "detection_confidence": 0.8618
+    },
+    {
+      "timestamp": "2025-11-20T22:46:37.672280",
+      "plate": "0317777",
+      "ocr_confidence": 0.2389,
+      "detection_confidence": 0.7459
+    },
+    {
+      "timestamp": "2025-11-20T22:46:40.398548",
+      "plate": "KK4411",
+      "ocr_confidence": 0.24,
+      "detection_confidence": 0.8078
+    },
+    {
+      "timestamp": "2025-11-20T22:46:42.589517",
+      "plate": "041100",
+      "ocr_confidence": 0.2658,
+      "detection_confidence": 0.7215
+    },
+    {
+      "timestamp": "2025-11-20T22:46:45.881387",
+      "plate": "2094168",
+      "ocr_confidence": 0.9578,
+      "detection_confidence": 0.938
+    },
+    {
+      "timestamp": "2025-11-20T22:46:49.340471",
+      "plate": "3094168",
+      "ocr_confidence": 0.8874,
+      "detection_confidence": 0.9111
+    },
+    {
+      "timestamp": "2025-11-20T22:46:53.619318",
+      "plate": "2094168",
+      "ocr_confidence": 0.9999,
+      "detection_confidence": 0.922
+    }
+  ]
+}

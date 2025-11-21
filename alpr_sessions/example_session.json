@@ -1,0 +1,25 @@
+{
+  "session_id": "20250108_143025",
+  "session_start": "2025-01-08T14:30:25.123456",
+  "total_detections": 3,
+  "detections": [
+    {
+      "timestamp": "2025-01-08T14:30:25.123456",
+      "plate": "ABC1234",
+      "ocr_confidence": 0.9823,
+      "detection_confidence": 0.8765
+    },
+    {
+      "timestamp": "2025-01-08T14:31:12.654321",
+      "plate": "XYZ5678",
+      "ocr_confidence": 0.9956,
+      "detection_confidence": 0.9123
+    },
+    {
+      "timestamp": "2025-01-08T14:32:45.987654",
+      "plate": "ABC1234",
+      "ocr_confidence": 0.9867,
+      "detection_confidence": 0.8912
+    }
+  ]
+}

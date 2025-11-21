@@ -1,0 +1,246 @@
+═══════════════════════════════════════════════════════════
+  FastALPR - Debian/Ubuntu Quick Setup Commands
+═══════════════════════════════════════════════════════════
+
+OPTION 1: AUTOMATED SETUP (Recommended)
+────────────────────────────────────────────────────────────
+git clone https://github.com/ankandrew/fast-alpr.git
+cd fast-alpr
+chmod +x install_debian.sh
+./install_debian.sh
+
+
+OPTION 2: MANUAL SETUP (Step by Step)
+────────────────────────────────────────────────────────────
+
+1. Update System
+────────────────
+sudo apt update && sudo apt upgrade -y
+
+
+2. Install Python & Development Tools
+──────────────────────────────────────
+sudo apt install -y python3 python3-pip python3-venv python3-dev git
+
+
+3. Install OpenCV System Dependencies
+──────────────────────────────────────
+# Core packages
+sudo apt install -y \
+    libgtk-3-dev \
+    pkg-config \
+    libavcodec-dev \
+    libavformat-dev \
+    libswscale-dev \
+    libv4l-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libtiff-dev \
+    libtbb-dev \
+    v4l-utils
+
+# For Ubuntu 24.04+ use:
+sudo apt install -y libgl1 libglib2.0-0t64
+
+# For Ubuntu 22.04 and older use:
+# sudo apt install -y libgl1-mesa-glx libglib2.0-0
+
+
+4. Clone Repository
+────────────────────
+cd ~
+git clone https://github.com/ankandrew/fast-alpr.git
+cd fast-alpr
+
+
+5. Create Virtual Environment
+──────────────────────────────
+python3 -m venv venv
+source venv/bin/activate
+
+
+6. Install Python Packages
+───────────────────────────
+pip install --upgrade pip
+pip install -e ".[onnx]"
+pip uninstall opencv-python-headless -y
+pip install opencv-python
+
+
+7. Fix Webcam Permissions
+──────────────────────────
+sudo usermod -a -G video $USER
+newgrp video
+
+
+8. Test Installation
+─────────────────────
+source venv/bin/activate
+python3 test_alpr.py
+python3 test_webcam.py
+python3 webcam_alpr.py
+
+
+ALL-IN-ONE COMMAND (Copy & Paste)
+────────────────────────────────────────────────────────────
+sudo apt update && \
+sudo apt install -y python3 python3-pip python3-venv python3-dev git \
+    libgtk-3-dev libgtk2.0-dev pkg-config libavcodec-dev libavformat-dev \
+    libswscale-dev libv4l-dev libxvidcore-dev libx264-dev libjpeg-dev \
+    libpng-dev libtiff-dev gfortran openexr libtbb-dev libdc1394-dev \
+    v4l-utils libgl1-mesa-glx libglib2.0-0 && \
+cd ~ && \
+git clone https://github.com/ankandrew/fast-alpr.git && \
+cd fast-alpr && \
+python3 -m venv venv && \
+source venv/bin/activate && \
+pip install --upgrade pip && \
+pip install -e ".[onnx]" && \
+pip uninstall opencv-python-headless -y && \
+pip install opencv-python && \
+sudo usermod -a -G video $USER
+
+
+DAILY USAGE
+────────────────────────────────────────────────────────────
+# Always activate virtual environment first
+cd ~/fast-alpr
+source venv/bin/activate
+
+# Then run
+python3 webcam_alpr.py
+
+
+TESTING COMMANDS
+────────────────────────────────────────────────────────────
+python3 test_alpr.py          # Test static image
+python3 test_webcam.py        # Test webcam only
+python3 webcam_alpr.py        # Live plate recognition
+
+Controls:
+  q = quit
+  s = screenshot
+
+
+VERIFICATION
+────────────────────────────────────────────────────────────
+python3 --version                           # Check Python
+pip list | grep fast-alpr                   # Check fast-alpr
+pip list | grep opencv                      # Should show opencv-python
+ls -l /dev/video*                           # Check webcam devices
+v4l2-ctl --list-devices                     # List webcam info
+
+
+TROUBLESHOOTING
+────────────────────────────────────────────────────────────
+
+Problem: "Could not open webcam"
+Solution:
+  sudo usermod -a -G video $USER
+  newgrp video
+  # Or log out and log back in
+
+Problem: "libGL.so.1: cannot open shared object file"
+Solution:
+  sudo apt install -y libgl1-mesa-glx libglib2.0-0
+
+Problem: Webcam not detected
+Solution:
+  ls /dev/video*
+  v4l2-ctl --list-devices
+  sudo apt install cheese && cheese
+
+Problem: Display issues over SSH
+Solution:
+  ssh -X user@hostname
+  export DISPLAY=:0
+
+Problem: "Module 'cv2' has no attribute 'imshow'"
+Solution:
+  pip uninstall opencv-python-headless -y
+  pip install opencv-python
+
+
+VIRTUAL ENVIRONMENT
+────────────────────────────────────────────────────────────
+# Activate (do this every time)
+source venv/bin/activate
+
+# Deactivate
+deactivate
+
+# Recreate from scratch
+rm -rf venv
+python3 -m venv venv
+source venv/bin/activate
+pip install -e ".[onnx]"
+pip uninstall opencv-python-headless -y
+pip install opencv-python
+
+
+GPU SUPPORT (NVIDIA Only)
+────────────────────────────────────────────────────────────
+# Check if CUDA available
+nvidia-smi
+
+# Install GPU version
+source venv/bin/activate
+pip install -e ".[onnx-gpu]"
+pip uninstall opencv-python-headless -y
+pip install opencv-python
+
+
+OUTPUT FILES
+────────────────────────────────────────────────────────────
+assets/test_output.png                      # Test result
+alpr_sessions/session_YYYYMMDD_HHMMSS.json  # Detected plates
+alpr_sessions/screenshot_*.png              # Screenshots
+
+# View JSON
+cat alpr_sessions/session_*.json
+
+
+DOCUMENTATION FILES
+────────────────────────────────────────────────────────────
+SETUP_DEBIAN.md       - Detailed Debian/Ubuntu setup guide
+WEBCAM_USAGE.md       - How to use webcam features
+README.md             - Project overview
+
+
+KEY DIFFERENCES FROM WINDOWS
+────────────────────────────────────────────────────────────
+1. Use python3 (not python)
+2. Need system libraries for OpenCV GUI (GTK)
+3. Need to be in 'video' group for webcam
+4. Use virtual environment (venv)
+5. Use source instead of activate script
+
+
+SYSTEMD SERVICE (Run on Boot)
+────────────────────────────────────────────────────────────
+sudo nano /etc/systemd/system/fast-alpr.service
+
+[Unit]
+Description=FastALPR Webcam Service
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+WorkingDirectory=/home/YOUR_USERNAME/fast-alpr
+Environment="DISPLAY=:0"
+ExecStart=/home/YOUR_USERNAME/fast-alpr/venv/bin/python3 webcam_alpr.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+# Enable and start
+sudo systemctl enable fast-alpr
+sudo systemctl start fast-alpr
+sudo systemctl status fast-alpr
+
+
+═══════════════════════════════════════════════════════════
+  Ready! Run: source venv/bin/activate && python3 webcam_alpr.py
+═══════════════════════════════════════════════════════════

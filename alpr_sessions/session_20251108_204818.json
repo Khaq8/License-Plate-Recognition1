@@ -1,0 +1,13 @@
+{
+  "session_id": "20251108_204818",
+  "session_start": "2025-11-08T20:49:06.349117",
+  "total_detections": 1,
+  "detections": [
+    {
+      "timestamp": "2025-11-08T20:49:06.349117",
+      "plate": "699900",
+      "ocr_confidence": 0.9555,
+      "detection_confidence": 0.947
+    }
+  ]
+}

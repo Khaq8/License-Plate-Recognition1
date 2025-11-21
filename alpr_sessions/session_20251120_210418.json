@@ -1,0 +1,133 @@
+{
+  "session_id": "20251120_210418",
+  "session_start": "2025-11-20T21:04:49.025334",
+  "total_detections": 21,
+  "detections": [
+    {
+      "timestamp": "2025-11-20T21:04:49.025334",
+      "plate": "130DMT",
+      "ocr_confidence": 0.3504,
+      "detection_confidence": 0.7954
+    },
+    {
+      "timestamp": "2025-11-20T21:04:51.612951",
+      "plate": "230NNT",
+      "ocr_confidence": 0.529,
+      "detection_confidence": 0.8059
+    },
+    {
+      "timestamp": "2025-11-20T21:04:53.232956",
+      "plate": "X330NU",
+      "ocr_confidence": 0.4145,
+      "detection_confidence": 0.9424
+    },
+    {
+      "timestamp": "2025-11-20T21:04:56.149919",
+      "plate": "Y330NT",
+      "ocr_confidence": 0.4051,
+      "detection_confidence": 0.9002
+    },
+    {
+      "timestamp": "2025-11-20T21:04:59.198222",
+      "plate": "2033NT",
+      "ocr_confidence": 0.3671,
+      "detection_confidence": 0.8956
+    },
+    {
+      "timestamp": "2025-11-20T21:05:02.122479",
+      "plate": "2333NU",
+      "ocr_confidence": 0.3892,
+      "detection_confidence": 0.9503
+    },
+    {
+      "timestamp": "2025-11-20T21:05:04.474745",
+      "plate": "P000NNU",
+      "ocr_confidence": 0.4414,
+      "detection_confidence": 0.7566
+    },
+    {
+      "timestamp": "2025-11-20T21:05:07.596594",
+      "plate": "N330NUU",
+      "ocr_confidence": 0.3934,
+      "detection_confidence": 0.7477
+    },
+    {
+      "timestamp": "2025-11-20T21:05:09.156648",
+      "plate": "S330NUU",
+      "ocr_confidence": 0.3959,
+      "detection_confidence": 0.7742
+    },
+    {
+      "timestamp": "2025-11-20T21:05:11.592933",
+      "plate": "N030NUU",
+      "ocr_confidence": 0.4025,
+      "detection_confidence": 0.7578
+    },
+    {
+      "timestamp": "2025-11-20T21:05:14.085445",
+      "plate": "P307NUU",
+      "ocr_confidence": 0.4011,
+      "detection_confidence": 0.8823
+    },
+    {
+      "timestamp": "2025-11-20T21:05:17.508111",
+      "plate": "MO30NNU",
+      "ocr_confidence": 0.3823,
+      "detection_confidence": 0.8675
+    },
+    {
+      "timestamp": "2025-11-20T21:05:20.047990",
+      "plate": "3000NTU",
+      "ocr_confidence": 0.4682,
+      "detection_confidence": 0.8668
+    },
+    {
+      "timestamp": "2025-11-20T21:05:35.795939",
+      "plate": "000031",
+      "ocr_confidence": 0.2604,
+      "detection_confidence": 0.8313
+    },
+    {
+      "timestamp": "2025-11-20T21:05:38.177146",
+      "plate": "2831TT",
+      "ocr_confidence": 0.5312,
+      "detection_confidence": 0.8469
+    },
+    {
+      "timestamp": "2025-11-20T21:05:40.699525",
+      "plate": "Y037NUU",
+      "ocr_confidence": 0.4378,
+      "detection_confidence": 0.8957
+    },
+    {
+      "timestamp": "2025-11-20T21:05:43.596648",
+      "plate": "233ENUU",
+      "ocr_confidence": 0.4699,
+      "detection_confidence": 0.8719
+    },
+    {
+      "timestamp": "2025-11-20T21:05:46.521823",
+      "plate": "203ENTU",
+      "ocr_confidence": 0.4629,
+      "detection_confidence": 0.8516
+    },
+    {
+      "timestamp": "2025-11-20T21:05:49.687438",
+      "plate": "103ENT",
+      "ocr_confidence": 0.4683,
+      "detection_confidence": 0.8742
+    },
+    {
+      "timestamp": "2025-11-20T21:05:52.002626",
+      "plate": "Y333NU",
+      "ocr_confidence": 0.4781,
+      "detection_confidence": 0.9604
+    },
+    {
+      "timestamp": "2025-11-20T21:05:54.168254",
+      "plate": "3333NTU",
+      "ocr_confidence": 0.4503,
+      "detection_confidence": 0.8896
+    }
+  ]
+}

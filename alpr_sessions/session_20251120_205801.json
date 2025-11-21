@@ -1,0 +1,271 @@
+{
+  "session_id": "20251120_205801",
+  "session_start": "2025-11-20T20:58:16.437365",
+  "total_detections": 44,
+  "detections": [
+    {
+      "timestamp": "2025-11-20T20:58:16.437365",
+      "plate": "244WI",
+      "ocr_confidence": 0.4615,
+      "detection_confidence": 0.8488
+    },
+    {
+      "timestamp": "2025-11-20T20:58:16.528210",
+      "plate": "00000",
+      "ocr_confidence": 0.2819,
+      "detection_confidence": 0.7565
+    },
+    {
+      "timestamp": "2025-11-20T20:58:18.979301",
+      "plate": "I471",
+      "ocr_confidence": 0.5878,
+      "detection_confidence": 0.8714
+    },
+    {
+      "timestamp": "2025-11-20T20:58:20.986677",
+      "plate": "03600",
+      "ocr_confidence": 0.3361,
+      "detection_confidence": 0.7504
+    },
+    {
+      "timestamp": "2025-11-20T20:58:23.220378",
+      "plate": "5AU5341",
+      "ocr_confidence": 0.9995,
+      "detection_confidence": 0.8874
+    },
+    {
+      "timestamp": "2025-11-20T20:58:29.456939",
+      "plate": "5AU5341",
+      "ocr_confidence": 0.9994,
+      "detection_confidence": 0.8863
+    },
+    {
+      "timestamp": "2025-11-20T20:58:31.020365",
+      "plate": "AA4444",
+      "ocr_confidence": 0.3784,
+      "detection_confidence": 0.8464
+    },
+    {
+      "timestamp": "2025-11-20T20:58:32.696396",
+      "plate": "AA04400",
+      "ocr_confidence": 0.2609,
+      "detection_confidence": 0.771
+    },
+    {
+      "timestamp": "2025-11-20T20:58:35.088382",
+      "plate": "AA1044",
+      "ocr_confidence": 0.4108,
+      "detection_confidence": 0.8695
+    },
+    {
+      "timestamp": "2025-11-20T20:58:37.752694",
+      "plate": "5AU5341",
+      "ocr_confidence": 0.9695,
+      "detection_confidence": 0.8698
+    },
+    {
+      "timestamp": "2025-11-20T20:59:09.811518",
+      "plate": "633300",
+      "ocr_confidence": 0.2728,
+      "detection_confidence": 0.8367
+    },
+    {
+      "timestamp": "2025-11-20T20:59:16.705645",
+      "plate": "B33600",
+      "ocr_confidence": 0.2867,
+      "detection_confidence": 0.7695
+    },
+    {
+      "timestamp": "2025-11-20T20:59:35.279409",
+      "plate": "111111",
+      "ocr_confidence": 0.5769,
+      "detection_confidence": 0.808
+    },
+    {
+      "timestamp": "2025-11-20T20:59:37.209054",
+      "plate": "1411133",
+      "ocr_confidence": 0.8431,
+      "detection_confidence": 0.8696
+    },
+    {
+      "timestamp": "2025-11-20T20:59:39.882654",
+      "plate": "1441913",
+      "ocr_confidence": 0.9799,
+      "detection_confidence": 0.8741
+    },
+    {
+      "timestamp": "2025-11-20T20:59:45.740486",
+      "plate": "A34462",
+      "ocr_confidence": 0.2439,
+      "detection_confidence": 0.7228
+    },
+    {
+      "timestamp": "2025-11-20T20:59:48.851313",
+      "plate": "3330000",
+      "ocr_confidence": 0.2186,
+      "detection_confidence": 0.7672
+    },
+    {
+      "timestamp": "2025-11-20T20:59:53.006359",
+      "plate": "H33306",
+      "ocr_confidence": 0.2472,
+      "detection_confidence": 0.8041
+    },
+    {
+      "timestamp": "2025-11-20T20:59:54.732094",
+      "plate": "B33666",
+      "ocr_confidence": 0.2381,
+      "detection_confidence": 0.8406
+    },
+    {
+      "timestamp": "2025-11-20T20:59:57.291993",
+      "plate": "B33411",
+      "ocr_confidence": 0.2715,
+      "detection_confidence": 0.8804
+    },
+    {
+      "timestamp": "2025-11-20T20:59:59.324755",
+      "plate": "CCC0116",
+      "ocr_confidence": 0.5274,
+      "detection_confidence": 0.8889
+    },
+    {
+      "timestamp": "2025-11-20T21:00:01.621779",
+      "plate": "2094168",
+      "ocr_confidence": 0.9999,
+      "detection_confidence": 0.9311
+    },
+    {
+      "timestamp": "2025-11-20T21:00:18.009230",
+      "plate": "H333",
+      "ocr_confidence": 0.302,
+      "detection_confidence": 0.7604
+    },
+    {
+      "timestamp": "2025-11-20T21:00:19.926987",
+      "plate": "330640",
+      "ocr_confidence": 0.3003,
+      "detection_confidence": 0.8417
+    },
+    {
+      "timestamp": "2025-11-20T21:00:21.690472",
+      "plate": "44447",
+      "ocr_confidence": 0.3685,
+      "detection_confidence": 0.8862
+    },
+    {
+      "timestamp": "2025-11-20T21:00:23.819422",
+      "plate": "7048826",
+      "ocr_confidence": 0.9983,
+      "detection_confidence": 0.879
+    },
+    {
+      "timestamp": "2025-11-20T21:00:30.698924",
+      "plate": "ZD48887",
+      "ocr_confidence": 0.8497,
+      "detection_confidence": 0.8449
+    },
+    {
+      "timestamp": "2025-11-20T21:00:36.390655",
+      "plate": "B33000",
+      "ocr_confidence": 0.2553,
+      "detection_confidence": 0.7671
+    },
+    {
+      "timestamp": "2025-11-20T21:00:48.224370",
+      "plate": "14423",
+      "ocr_confidence": 0.6522,
+      "detection_confidence": 0.8913
+    },
+    {
+      "timestamp": "2025-11-20T21:00:50.520842",
+      "plate": "64423",
+      "ocr_confidence": 0.9283,
+      "detection_confidence": 0.8767
+    },
+    {
+      "timestamp": "2025-11-20T21:00:53.262008",
+      "plate": "17423",
+      "ocr_confidence": 0.7903,
+      "detection_confidence": 0.9151
+    },
+    {
+      "timestamp": "2025-11-20T21:00:55.561289",
+      "plate": "64423",
+      "ocr_confidence": 0.8411,
+      "detection_confidence": 0.8785
+    },
+    {
+      "timestamp": "2025-11-20T21:01:02.674393",
+      "plate": "16443",
+      "ocr_confidence": 0.7992,
+      "detection_confidence": 0.8831
+    },
+    {
+      "timestamp": "2025-11-20T21:01:04.880718",
+      "plate": "17423",
+      "ocr_confidence": 0.7259,
+      "detection_confidence": 0.8828
+    },
+    {
+      "timestamp": "2025-11-20T21:01:10.408224",
+      "plate": "114433",
+      "ocr_confidence": 0.7638,
+      "detection_confidence": 0.8793
+    },
+    {
+      "timestamp": "2025-11-20T21:01:12.962494",
+      "plate": "64423",
+      "ocr_confidence": 0.7505,
+      "detection_confidence": 0.8832
+    },
+    {
+      "timestamp": "2025-11-20T21:01:17.964678",
+      "plate": "LA4427",
+      "ocr_confidence": 0.3993,
+      "detection_confidence": 0.7974
+    },
+    {
+      "timestamp": "2025-11-20T21:01:25.074904",
+      "plate": "1117714",
+      "ocr_confidence": 0.41,
+      "detection_confidence": 0.7747
+    },
+    {
+      "timestamp": "2025-11-20T21:01:35.929153",
+      "plate": "G072265",
+      "ocr_confidence": 0.8544,
+      "detection_confidence": 0.863
+    },
+    {
+      "timestamp": "2025-11-20T21:01:42.682136",
+      "plate": "G078265",
+      "ocr_confidence": 0.8362,
+      "detection_confidence": 0.9215
+    },
+    {
+      "timestamp": "2025-11-20T21:01:44.790544",
+      "plate": "G072265",
+      "ocr_confidence": 0.7695,
+      "detection_confidence": 0.8972
+    },
+    {
+      "timestamp": "2025-11-20T21:01:47.084963",
+      "plate": "07726",
+      "ocr_confidence": 0.4868,
+      "detection_confidence": 0.9035
+    },
+    {
+      "timestamp": "2025-11-20T21:01:51.530121",
+      "plate": "G078265",
+      "ocr_confidence": 0.9319,
+      "detection_confidence": 0.8966
+    },
+    {
+      "timestamp": "2025-11-20T21:01:54.110181",
+      "plate": "8078265",
+      "ocr_confidence": 0.9441,
+      "detection_confidence": 0.9224
+    }
+  ]
+}

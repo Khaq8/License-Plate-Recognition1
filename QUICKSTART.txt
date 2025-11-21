@@ -1,0 +1,98 @@
+═══════════════════════════════════════════════════════════
+  FastALPR - Quick Start Commands
+═══════════════════════════════════════════════════════════
+
+OPTION 1: AUTOMATED SETUP (Recommended)
+────────────────────────────────────────────────────────────
+python setup.py
+
+
+OPTION 2: MANUAL SETUP
+────────────────────────────────────────────────────────────
+
+Step 1: Install FastALPR with ONNX runtime
+───────────────────────────────────────────
+pip install -e ".[onnx]"
+
+Step 2: Remove headless OpenCV (no GUI)
+────────────────────────────────────────
+pip uninstall opencv-python-headless -y
+
+Step 3: Install full OpenCV (with GUI)
+───────────────────────────────────────
+pip install opencv-python
+
+
+TESTING
+────────────────────────────────────────────────────────────
+
+Test 1: Static Image Recognition
+─────────────────────────────────
+python test_alpr.py
+
+Test 2: Webcam Test
+───────────────────
+python test_webcam.py
+
+Test 3: Live License Plate Recognition
+───────────────────────────────────────
+python webcam_alpr.py
+
+
+ALL-IN-ONE COMMANDS
+────────────────────────────────────────────────────────────
+
+Windows (PowerShell/CMD):
+─────────────────────────
+pip install -e ".[onnx]" && pip uninstall opencv-python-headless -y && pip install opencv-python && python test_alpr.py
+
+Linux/Mac (Bash):
+─────────────────
+pip install -e ".[onnx]" && pip uninstall opencv-python-headless -y && pip install opencv-python && python test_alpr.py
+
+
+GPU SUPPORT (Optional - for NVIDIA GPUs)
+────────────────────────────────────────────────────────────
+pip install -e ".[onnx-gpu]"
+pip uninstall opencv-python-headless -y
+pip install opencv-python
+
+
+TROUBLESHOOTING
+────────────────────────────────────────────────────────────
+
+Problem: "Could not open webcam"
+Solution: Close other apps using webcam (Zoom, Teams, etc.)
+
+Problem: "OpenCV GUI not supported"
+Solution: pip uninstall opencv-python-headless -y && pip install opencv-python
+
+Problem: "Module fast_alpr not found"
+Solution: pip install -e ".[onnx]"
+
+
+VERIFICATION
+────────────────────────────────────────────────────────────
+python --version              # Check Python (needs 3.10+)
+pip list | grep fast-alpr     # Verify fast-alpr installed
+pip list | grep opencv        # Should show opencv-python
+pip list | grep onnx          # Verify onnxruntime installed
+
+
+FILES CREATED AFTER RUNNING
+────────────────────────────────────────────────────────────
+assets/test_output.png                    # From test_alpr.py
+alpr_sessions/session_YYYYMMDD_HHMMSS.json   # From webcam_alpr.py
+alpr_sessions/screenshot_*.png             # Screenshots (if taken)
+
+
+DOCUMENTATION
+────────────────────────────────────────────────────────────
+SETUP.md          - Detailed setup instructions
+WEBCAM_USAGE.md   - Webcam usage guide
+README.md         - Project overview
+
+
+═══════════════════════════════════════════════════════════
+  Ready to go! Run: python webcam_alpr.py
+═══════════════════════════════════════════════════════════
