@@ -8,21 +8,102 @@ import os
 from datetime import datetime
 from pathlib import Path
 from time import time
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from app.db.database import  engine
-from app.db import models
 import requests
-from app.routers import auth,plate,user
+from app.routers import auth, plate, user, car, parking_lot, parking, admin
+from app.cache import redis_cache
 import cv2
 from fast_alpr import ALPR
 
-models.Base.metadata.create_all(bind=engine)
+# Note: Database tables are now managed by Supabase (no SQLAlchemy migration needed)
 
-app = FastAPI(title="License Plate Recognition System")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan handler for startup/shutdown events."""
+    # Startup: Connect to Redis (required)
+    print("Connecting to Redis...")
+    try:
+        await redis_cache.connect()
+        print("Redis connection established")
+    except Exception as e:
+        print(f"FATAL: Could not connect to Redis: {e}")
+        raise RuntimeError("Redis connection required. Please ensure Redis is running.")
+
+    yield
+
+    # Shutdown: Disconnect from Redis
+    print("Disconnecting from Redis...")
+    await redis_cache.disconnect()
+    print("Redis disconnected")
+
+
+app = FastAPI(
+    title="License Plate Recognition System",
+    description="Multi-lot parking management with ALPR",
+    version="2.0.0",
+    lifespan=lifespan
+)
+
+# Authentication & User routes
 app.include_router(auth.router)
-app.include_router(plate.router)
 app.include_router(user.router)
+app.include_router(car.router)
+
+# Plate detection routes
+app.include_router(plate.router)
+
+# Parking management routes
+app.include_router(parking_lot.router)
+app.include_router(parking.router)
+app.include_router(admin.router)
+
+
+# ============== Health Check Endpoints ==============
+
+@app.get("/health", tags=["Health"])
+async def health_check():
+    """Basic health check endpoint for Docker/Kubernetes."""
+    return {"status": "healthy", "service": "lpr-api"}
+
+
+@app.get("/health/ready", tags=["Health"])
+async def readiness_check():
+    """
+    Readiness check - validates all dependencies are available.
+    Used by Docker Compose and orchestrators to determine if the service is ready.
+    """
+    checks = {
+        "api": "healthy",
+        "redis": "unknown",
+        "supabase": "unknown"
+    }
+
+    # Check Redis
+    try:
+        await redis_cache.ping()
+        checks["redis"] = "healthy"
+    except Exception as e:
+        checks["redis"] = f"unhealthy: {str(e)}"
+
+    # Check Supabase (basic connectivity)
+    try:
+        from app.supabase_client import get_supabase_admin
+        supabase = get_supabase_admin()
+        # Simple query to verify connection
+        supabase.table("parking_lots").select("id").limit(1).execute()
+        checks["supabase"] = "healthy"
+    except Exception as e:
+        checks["supabase"] = f"unhealthy: {str(e)}"
+
+    all_healthy = all(v == "healthy" for v in checks.values())
+
+    return {
+        "status": "ready" if all_healthy else "degraded",
+        "checks": checks,
+        "timestamp": datetime.now().isoformat()
+    }
 
 
 class WebcamALPR:

@@ -20,6 +20,12 @@
       "plate": "ABC1234",
       "ocr_confidence": 0.9867,
       "detection_confidence": 0.8912
+    },
+    {
+      "timestamp": "2025-01-08T14:32:45.987654",
+      "plate": "699900",
+      "ocr_confidence": 0.9867,
+      "detection_confidence": 0.8912
     }
   ]
 }

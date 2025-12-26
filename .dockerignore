@@ -1,0 +1,89 @@
+# ============================================================
+# License Plate Recognition System - Docker Ignore
+# ============================================================
+
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.env.local
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation
+*.md
+!README.md
+docs/
+mkdocs.yml
+
+# Frontend (React Native - not needed in backend container)
+frontend/
+node_modules/
+package-lock.json
+package.json
+
+# Supabase local
+supabase/
+
+# Test files
+tests/
+test_*.py
+*_test.py
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment files (sensitive data)
+.env
+.env.*
+!.env.example
+
+# Logs and data
+*.log
+logs/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.docker/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Miscellaneous
+*.bak
+*.orig
+SETUP*.md
+QUICKSTART*.txt
+INSTALL*.txt
+Makefile
+setup.py
+verify_db.py
+SUPABASE_*.md
+SUPABASE_*.py
+PROGRESS_SUMMARY.md

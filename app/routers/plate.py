@@ -1,126 +1,239 @@
+"""
+Plate Detection Router for License Plate Recognition System
+Handles ALPR detection logs using Supabase.
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy.orm import Session,joinedload
-from app.security import get_current_admin
-from app.db.database import get_db
-from app.db.models import GovPlate, PlateDetection ,User
-from app.db.schema import PlateDetectionSchema, PlateListSchema ,PlateResponse,PlateUpdate
+from pydantic import BaseModel
+from typing import List, Optional
+from datetime import datetime
+
+from app.supabase_client import get_supabase_admin
+from app.security import get_current_admin, CurrentUser
+
 
 router = APIRouter(
     prefix="/plates",
     tags=["Plates"]
 )
 
-@router.get("/", response_model=list[PlateListSchema])
-def get_all_plates(
-    db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin)
+
+# ============== Schemas ==============
+
+class GovPlateSchema(BaseModel):
+    id: int
+    gov_plate_numb: str
+    plate: str
+
+
+class PlateDetectionSchema(BaseModel):
+    id: int
+    session_id: Optional[str]
+    timestamp: datetime
+    plate: str
+    ocr_confidence: float
+    detection_confidence: float
+    govplate: Optional[GovPlateSchema] = None
+
+
+class PlateListSchema(BaseModel):
+    id: int
+    plate: str
+    timestamp: datetime
+    gov_plate_numb: Optional[str] = None
+
+
+class PlateResponse(BaseModel):
+    id: int
+    session_id: str
+    timestamp: datetime
+    plate: str
+    ocr_confidence: float
+    detection_confidence: float
+
+
+class PlateUpdate(BaseModel):
+    session_id: Optional[str] = None
+    plate: Optional[str] = None
+    ocr_confidence: Optional[float] = None
+    detection_confidence: Optional[float] = None
+
+
+# ============== Endpoints ==============
+
+@router.get("/", response_model=List[PlateListSchema])
+async def get_all_plates(
+    admin: CurrentUser = Depends(get_current_admin)
 ):
-    results = (
-        db.query(PlateDetection)
-        .outerjoin(GovPlate)
-        .add_columns(GovPlate.gov_plate_numb)
-        .all()
-    )
+    """Get all plate detections (admin only)."""
+    supabase = get_supabase_admin()
+
+    # Get plate detections with gov plate info
+    result = supabase.table("plate_detections").select(
+        "id, plate, timestamp, gov_plate_numb(gov_plate_numb)"
+    ).order("timestamp", desc=True).execute()
 
     output = []
-    for plate, gov_num in results:
+    for plate in result.data:
+        gov_num = None
+        if plate.get("gov_plate_numb") and len(plate["gov_plate_numb"]) > 0:
+            gov_num = plate["gov_plate_numb"][0].get("gov_plate_numb")
+
         output.append({
-            "id": plate.id,
-            "plate": plate.plate,
-            "timestamp": plate.timestamp,
+            "id": plate["id"],
+            "plate": plate["plate"],
+            "timestamp": plate["timestamp"],
             "gov_plate_numb": gov_num
         })
+
     return output
 
+
 @router.get("/id/{id}", response_model=PlateDetectionSchema)
-def search_by_id(
+async def search_by_id(
     id: int,
-    db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin)
+    admin: CurrentUser = Depends(get_current_admin)
 ):
-    result = db.query(PlateDetection).filter(PlateDetection.id == id).first()
-    if not result:
+    """Get plate detection by ID (admin only)."""
+    supabase = get_supabase_admin()
+
+    result = supabase.table("plate_detections").select("*").eq("id", id).single().execute()
+
+    if not result.data:
         raise HTTPException(status_code=404, detail="Plate ID not found")
-    return result
 
-@router.get("/search/{plate}", response_model=list[PlateDetectionSchema])
-def search_plate(
+    # Get gov plate if exists
+    gov_plate = supabase.table("gov_plate_numb").select("*").eq(
+        "detection_id", id
+    ).execute()
+
+    data = result.data
+    if gov_plate.data:
+        data["govplate"] = gov_plate.data[0]
+
+    return PlateDetectionSchema(**data)
+
+
+@router.get("/search/{plate}", response_model=List[PlateDetectionSchema])
+async def search_plate(
     plate: str,
-    db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin)
+    admin: CurrentUser = Depends(get_current_admin)
 ):
-    results = db.query(PlateDetection).filter(PlateDetection.plate == plate).all()
-    if not results:
-        raise HTTPException(status_code=404, detail="Plate not found")
-    return results
+    """Search for exact plate matches (admin only)."""
+    supabase = get_supabase_admin()
 
-@router.get("/search", response_model=list[PlateDetectionSchema])
-def search_plate_partial(
+    result = supabase.table("plate_detections").select("*").eq(
+        "plate", plate
+    ).order("timestamp", desc=True).execute()
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Plate not found")
+
+    return [PlateDetectionSchema(**p) for p in result.data]
+
+
+@router.get("/search", response_model=List[PlateDetectionSchema])
+async def search_plate_partial(
     q: str,
-    db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin)
+    admin: CurrentUser = Depends(get_current_admin)
 ):
-    return db.query(PlateDetection).filter(PlateDetection.plate.ilike(f"%{q}%")).all()
+    """Search for partial plate matches (admin only)."""
+    supabase = get_supabase_admin()
+
+    result = supabase.table("plate_detections").select("*").ilike(
+        "plate", f"%{q}%"
+    ).order("timestamp", desc=True).execute()
+
+    return [PlateDetectionSchema(**p) for p in result.data]
+
 
 @router.get("/search/{plate}/best", response_model=PlateDetectionSchema)
-def search_best_plate(
+async def search_best_plate(
     plate: str,
-    db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin)
+    admin: CurrentUser = Depends(get_current_admin)
 ):
-    result = (
-        db.query(PlateDetection)
-        .filter(PlateDetection.plate == plate)
-        .order_by(PlateDetection.ocr_confidence.desc())
-        .first()
-    )
-    if not result:
+    """Get the best (highest confidence) detection for a plate (admin only)."""
+    supabase = get_supabase_admin()
+
+    result = supabase.table("plate_detections").select("*").eq(
+        "plate", plate
+    ).order("ocr_confidence", desc=True).limit(1).execute()
+
+    if not result.data:
         raise HTTPException(status_code=404, detail="Plate not found")
-    return result
+
+    return PlateDetectionSchema(**result.data[0])
+
 
 @router.delete("/{id}", status_code=204)
-def delete_plate(
+async def delete_plate(
     id: int,
-    db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin)
+    admin: CurrentUser = Depends(get_current_admin)
 ):
-    query = db.query(PlateDetection).filter(PlateDetection.id == id)
-    record = query.first()
-    if not record:
+    """Delete a plate detection (admin only)."""
+    supabase = get_supabase_admin()
+
+    # Check if exists
+    existing = supabase.table("plate_detections").select("id").eq("id", id).execute()
+    if not existing.data:
         raise HTTPException(status_code=404, detail="Plate not found")
-    query.delete(synchronize_session=False)
-    db.commit()
+
+    # Delete (cascade will handle gov_plate_numb)
+    supabase.table("plate_detections").delete().eq("id", id).execute()
+
     return Response(status_code=204)
 
+
 @router.put("/{id}", response_model=PlateResponse)
-def update_plate(
+async def update_plate(
     id: int,
     updated: PlateUpdate,
-    db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin)
+    admin: CurrentUser = Depends(get_current_admin)
 ):
-    query = db.query(PlateDetection).filter(PlateDetection.id == id)
-    record = query.first()
-    if not record:
+    """Update a plate detection (admin only)."""
+    supabase = get_supabase_admin()
+
+    # Check if exists
+    existing = supabase.table("plate_detections").select("*").eq("id", id).single().execute()
+    if not existing.data:
         raise HTTPException(status_code=404, detail="Plate not found")
 
-    query.update(updated.dict(exclude_unset=True), synchronize_session=False)
-    db.commit()
-    return query.first()
-@router.get("/session/{session_id}", response_model=list[PlateDetectionSchema])
-def get_plates_by_session(
-    session_id: str,
-    db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin)
-):
-    records = (
-        db.query(PlateDetection)
-        .options(joinedload(PlateDetection.govplate))
-        .filter(PlateDetection.session_id == session_id)
-        .all()
-    )
+    # Build update data
+    update_data = {k: v for k, v in updated.model_dump().items() if v is not None}
 
-    if not records:
+    if not update_data:
+        return PlateResponse(**existing.data)
+
+    result = supabase.table("plate_detections").update(update_data).eq("id", id).execute()
+
+    return PlateResponse(**result.data[0])
+
+
+@router.get("/session/{session_id}", response_model=List[PlateDetectionSchema])
+async def get_plates_by_session(
+    session_id: str,
+    admin: CurrentUser = Depends(get_current_admin)
+):
+    """Get all plate detections for a session (admin only)."""
+    supabase = get_supabase_admin()
+
+    result = supabase.table("plate_detections").select("*").eq(
+        "session_id", session_id
+    ).order("timestamp", desc=True).execute()
+
+    if not result.data:
         raise HTTPException(status_code=404, detail="No detections found for this session")
 
-    return records
+    # Get gov plates for each detection
+    detections = []
+    for plate in result.data:
+        gov_plate = supabase.table("gov_plate_numb").select("*").eq(
+            "detection_id", plate["id"]
+        ).execute()
+
+        if gov_plate.data:
+            plate["govplate"] = gov_plate.data[0]
+
+        detections.append(PlateDetectionSchema(**plate))
+
+    return detections

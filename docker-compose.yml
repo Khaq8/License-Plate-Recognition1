@@ -1,0 +1,84 @@
+# ============================================================
+# License Plate Recognition System - Docker Compose
+# ============================================================
+
+services:
+  # FastAPI Backend
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lpr-api
+    ports:
+      - "8000:8000"
+    environment:
+      # Supabase Configuration (override in .env)
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET:-}
+      # Redis Configuration (uses Docker internal network)
+      - REDIS_URL=redis://redis:6379
+      # Security
+      - SECRET_KEY=${SECRET_KEY}
+      - ALGORITHM=${ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+    env_file:
+      - .env
+    volumes:
+      # Persist ALPR session data
+      - ./alpr_sessions:/app/alpr_sessions
+      # Persist downloaded models (YOLO, OCR)
+      - alpr-models:/home/appuser/.cache
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - lpr-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: lpr-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - lpr-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Named volumes for data persistence
+volumes:
+  redis-data:
+    driver: local
+  alpr-models:
+    driver: local
+
+# Isolated network
+networks:
+  lpr-network:
+    driver: bridge

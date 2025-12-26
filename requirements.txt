@@ -1,0 +1,40 @@
+# ============================================================
+# License Plate Recognition System - Python Dependencies
+# ============================================================
+
+# FastAPI Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+
+# Pydantic (settings and validation)
+pydantic[email]>=2.5.0
+pydantic-settings>=2.1.0
+
+# Supabase (database and auth)
+supabase>=2.0.0
+gotrue>=2.0.0
+
+# Redis (caching)
+redis>=5.0.0
+
+# Security
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# OpenCV (headless for server/Docker - no GUI needed)
+opencv-python-headless>=4.8.0
+
+# ALPR (License Plate Recognition)
+fast-alpr>=0.1.0
+fast-plate-ocr>=0.1.0
+open-image-models>=0.1.0
+onnxruntime>=1.16.0
+
+# Utilities
+python-dotenv>=1.0.0
+requests>=2.31.0
+numpy>=1.24.0
+
+# Type hints (development)
+types-requests>=2.31.0

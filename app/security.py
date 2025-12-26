@@ -1,60 +1,217 @@
+"""
+Security module for License Plate Recognition System
+Handles JWT verification with Supabase Auth
+"""
+
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
-from app.db import schema, database, models
-from fastapi import Depends, status, HTTPException
-from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
+from typing import Optional
+from fastapi import Depends, status, HTTPException, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel
+
 from .config import settings
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-
-SECRET_KEY = settings.secret_key
-ALGORITHM = settings.algorithm
-ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
+from .supabase_client import get_supabase, get_supabase_admin
 
 
-def create_access_token(data: dict, expires_delta: int = ACCESS_TOKEN_EXPIRE_MINUTES):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=expires_delta)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+# HTTP Bearer security scheme
+security = HTTPBearer()
 
 
-def verify_access_token(token: str, credentials_exception):
+class TokenData(BaseModel):
+    """Token payload data."""
+    user_id: str
+    email: Optional[str] = None
+    is_admin: bool = False
+
+
+class CurrentUser(BaseModel):
+    """Current authenticated user data."""
+    id: str
+    email: Optional[str] = None
+    username: Optional[str] = None
+    full_name: Optional[str] = None
+    is_admin: bool = False
+    credit_balance: float = 0.0
+    phone: Optional[str] = None
+
+
+def verify_supabase_token(token: str) -> dict:
+    """
+    Verify a Supabase JWT token.
+    Returns the decoded payload if valid.
+    """
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("user_id")
-        if user_id is None:
-            raise credentials_exception
-        is_admin: bool = payload.get("is_admin", False)
-        token_data = schema.TokenData(id=user_id, is_admin=is_admin)
-    except JWTError:
-        raise credentials_exception
-    return token_data
+        # Try to decode with Supabase JWT secret if available
+        if settings.supabase_jwt_secret:
+            payload = jwt.decode(
+                token,
+                settings.supabase_jwt_secret,
+                algorithms=["HS256"],
+                audience="authenticated"
+            )
+        else:
+            # Fallback: Use Supabase to verify (makes API call)
+            supabase = get_supabase()
+            user = supabase.auth.get_user(token)
+            if user and user.user:
+                return {
+                    "sub": user.user.id,
+                    "email": user.user.email,
+                    "role": user.user.role,
+                    "user_metadata": user.user.user_metadata
+                }
+            raise JWTError("Invalid token")
+
+        return payload
+
+    except JWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token: {str(e)}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(database.get_db)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> CurrentUser:
+    """
+    FastAPI dependency to get the current authenticated user.
+    Verifies the JWT token and fetches user profile from Supabase.
+    """
+    token = credentials.credentials
 
-    token_data = verify_access_token(token, credentials_exception)
+    # Verify token
+    payload = verify_supabase_token(token)
+    user_id = payload.get("sub")
 
-    user = db.query(models.User).filter(models.User.id == token_data.id).first()
-    if user is None:
-        raise credentials_exception
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
-    return user
+    # Fetch user profile from Supabase
+    try:
+        supabase_admin = get_supabase_admin()
+        result = supabase_admin.table("profiles").select("*").eq("id", user_id).single().execute()
+
+        if not result.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User profile not found"
+            )
+
+        profile = result.data
+        return CurrentUser(
+            id=profile["id"],
+            email=profile.get("email"),
+            username=profile.get("username"),
+            full_name=profile.get("full_name"),
+            is_admin=profile.get("is_admin", False),
+            credit_balance=float(profile.get("credit_balance", 0)),
+            phone=profile.get("phone")
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching user profile: {str(e)}"
+        )
 
 
-def get_current_admin(user: models.User = Depends(get_current_user)):
-
-    if not user.is_admin:
+async def get_current_admin(
+    current_user: CurrentUser = Depends(get_current_user)
+) -> CurrentUser:
+    """
+    FastAPI dependency to ensure current user is an admin.
+    """
+    if not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You must be an admin to access this resource",
+            detail="You must be an admin to access this resource"
         )
-    return user
+    return current_user
+
+
+def get_optional_user(request: Request) -> Optional[CurrentUser]:
+    """
+    Get current user if authenticated, otherwise return None.
+    Useful for endpoints that work both authenticated and anonymously.
+    """
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+
+    token = auth_header.split(" ")[1]
+    try:
+        payload = verify_supabase_token(token)
+        user_id = payload.get("sub")
+
+        if not user_id:
+            return None
+
+        supabase_admin = get_supabase_admin()
+        result = supabase_admin.table("profiles").select("*").eq("id", user_id).single().execute()
+
+        if not result.data:
+            return None
+
+        profile = result.data
+        return CurrentUser(
+            id=profile["id"],
+            email=profile.get("email"),
+            username=profile.get("username"),
+            full_name=profile.get("full_name"),
+            is_admin=profile.get("is_admin", False),
+            credit_balance=float(profile.get("credit_balance", 0)),
+            phone=profile.get("phone")
+        )
+    except Exception:
+        return None
+
+
+# Legacy compatibility aliases
+def create_access_token(data: dict, expires_delta: int = None) -> str:
+    """
+    Legacy function - creates a custom JWT token.
+    Note: Prefer using Supabase Auth for new implementations.
+    """
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(
+        minutes=expires_delta or settings.access_token_expire_minutes
+    )
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
+
+
+def verify_access_token(token: str) -> TokenData:
+    """
+    Legacy function - verifies a custom JWT token.
+    Note: Prefer using Supabase Auth for new implementations.
+    """
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        user_id = payload.get("user_id")
+        if user_id is None:
+            raise JWTError("No user_id in token")
+        return TokenData(
+            user_id=str(user_id),
+            is_admin=payload.get("is_admin", False)
+        )
+    except JWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )

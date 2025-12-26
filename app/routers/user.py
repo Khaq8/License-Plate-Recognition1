@@ -1,53 +1,110 @@
-from fastapi import  status, HTTPException, Depends, APIRouter
-from sqlalchemy.orm import Session
-from app.db import models, schema
-from app.security import get_current_admin
-from app.utils import hash_password
-from app.db.database import get_db
+"""
+User Router for License Plate Recognition System
+Handles user management using Supabase.
+"""
+
+from fastapi import status, HTTPException, Depends, APIRouter
+from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime
+
+from app.supabase_client import get_supabase_admin
+from app.security import get_current_admin, CurrentUser
+
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED, response_model=schema.UserResponse)
-def create_user(user: schema.UserCreate, db: Session = Depends(get_db)):
+# ============== Schemas ==============
 
-    existing = db.query(models.User).filter(models.User.username == user.username).first()
-    if existing:
-        raise HTTPException(
-            status_code=400,
-            detail="Username already registered"
-        )
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    email: Optional[str] = None
+    full_name: Optional[str] = None
 
-    hashed_pw = hash_password(user.password)
 
-    new_user = models.User(
-        username=user.username,
-        password=hashed_pw
+class UserResponse(BaseModel):
+    id: str
+    username: str
+    email: Optional[str]
+    full_name: Optional[str]
+    is_admin: bool
+    credit_balance: float
+    created_at: Optional[datetime]
+
+
+# ============== Endpoints ==============
+
+@router.post("/", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
+async def create_user(user: UserCreate):
+    """
+    Create a new user (public registration).
+    Note: Use /auth/signup instead for Supabase Auth integration.
+    """
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Please use /auth/signup for user registration"
     )
 
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
 
-    return new_user
-
-@router.post("/admin", status_code=status.HTTP_201_CREATED, response_model=schema.UserResponse)
-def create_user_admin(
-    user: schema.UserCreate,
-    is_admin: bool = False,  
-    db: Session = Depends(get_db),
-    admin: models.User = Depends(get_current_admin)
+@router.post("/admin", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
+async def create_user_admin(
+    user: UserCreate,
+    is_admin: bool = False,
+    admin: CurrentUser = Depends(get_current_admin)
 ):
+    """
+    Create a new user with optional admin privileges (admin only).
+    """
+    supabase = get_supabase_admin()
 
-    existing = db.query(models.User).filter(models.User.username == user.username).first()
-    if existing:
+    # Check if username already exists
+    existing = supabase.table("profiles").select("id").eq("username", user.username).execute()
+    if existing.data:
         raise HTTPException(status_code=400, detail="Username already registered")
 
-    hashed_pw = hash_password(user.password)
-    new_user = models.User(username=user.username, password=hashed_pw, is_admin=is_admin)
+    # Create user via Supabase Auth admin API
+    try:
+        auth_response = supabase.auth.admin.create_user({
+            "email": user.email,
+            "password": user.password,
+            "email_confirm": True,  # Auto-confirm email for admin-created users
+            "user_metadata": {
+                "username": user.username,
+                "full_name": user.full_name
+            }
+        })
 
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+        if not auth_response.user:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create user"
+            )
 
-    return new_user
+        # Update profile to set admin status if needed
+        if is_admin:
+            supabase.table("profiles").update({
+                "is_admin": True
+            }).eq("id", auth_response.user.id).execute()
+
+        # Fetch the created profile
+        profile = supabase.table("profiles").select("*").eq(
+            "id", auth_response.user.id
+        ).single().execute()
+
+        return UserResponse(
+            id=profile.data["id"],
+            username=profile.data["username"],
+            email=profile.data.get("email"),
+            full_name=profile.data.get("full_name"),
+            is_admin=profile.data.get("is_admin", False),
+            credit_balance=float(profile.data.get("credit_balance", 0)),
+            created_at=profile.data.get("created_at")
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create user: {str(e)}"
+        )

@@ -1,26 +1,24 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from dotenv import load_dotenv
-import os
+"""
+Legacy database module - kept for backwards compatibility.
+The application now uses Supabase for all database operations.
+"""
 
-load_dotenv()
+from sqlalchemy.orm import declarative_base
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL environment variable is not set")
-
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-)
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
+# Base is still needed for model definitions (used by some imports)
 Base = declarative_base()
 
+# Legacy SQLAlchemy components are no longer used
+# All database operations now go through app/supabase_client.py
+engine = None
+SessionLocal = None
+
 def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    """
+    Legacy database dependency - no longer used.
+    All routes now use Supabase client directly.
+    """
+    raise NotImplementedError(
+        "SQLAlchemy database is no longer used. "
+        "Use Supabase client from app.supabase_client instead."
+    )
