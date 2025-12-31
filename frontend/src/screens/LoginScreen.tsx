@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { Input, Button } from '../components';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { hashPassword } from '../utils/password';
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -45,10 +46,18 @@ export function LoginScreen({ navigation }: Props) {
   const handleLogin = async () => {
     if (!validateForm()) return;
 
-    const result = await login(email, password);
+    try {
+      // Hash password before sending to backend (CWE-312, CWE-359 mitigation)
+      const hashedPassword = await hashPassword(password);
+      const result = await login(email, hashedPassword);
 
-    if (!result.success) {
-      Alert.alert('Login Failed', result.error || 'Please check your credentials');
+      if (!result.success) {
+        Alert.alert('Login Failed', result.error || 'Please check your credentials');
+      }
+    } catch (error) {
+      // CWE-532 mitigation: sanitized error logging
+      console.error('Login process failed');
+      Alert.alert('Login Failed', 'An error occurred during login');
     }
   };
 

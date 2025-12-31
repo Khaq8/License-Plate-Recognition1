@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Input, Button } from '../components';
 import { API_BASE_URL } from '../constants';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { hashPassword } from '../utils/password';
 
 type Props = {
     navigation: NativeStackNavigationProp<any>;
@@ -76,21 +77,18 @@ export function SignupScreen({ navigation }: Props) {
 
         setIsLoading(true);
 
-        const payload = {
-            username: username.trim(),
-            email: email.trim(),
-            first_name: firstName.trim(),
-            last_name: lastName.trim(),
-            password: password,
-        };
-
-        console.log('=== SIGNUP DEBUG ===');
-        console.log('API_BASE_URL:', API_BASE_URL);
-        console.log('Full URL:', `${API_BASE_URL}/auth/register`);
-        console.log('Payload:', JSON.stringify(payload, null, 2));
-
         try {
-            console.log('Sending fetch request...');
+            // Hash password before sending to backend (CWE-312, CWE-359 mitigation)
+            const hashedPassword = await hashPassword(password);
+
+            const payload = {
+                username: username.trim(),
+                email: email.trim(),
+                first_name: firstName.trim(),
+                last_name: lastName.trim(),
+                password: hashedPassword,
+            };
+
             const response = await fetch(`${API_BASE_URL}/auth/register`, {
                 method: 'POST',
                 headers: {
@@ -99,12 +97,7 @@ export function SignupScreen({ navigation }: Props) {
                 body: JSON.stringify(payload),
             });
 
-            console.log('Response status:', response.status);
-            console.log('Response ok:', response.ok);
-            console.log('Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
-
             const responseText = await response.text();
-            console.log('Response body (raw):', responseText);
 
             if (!response.ok) {
                 let errorDetail = 'Registration failed';
@@ -112,13 +105,10 @@ export function SignupScreen({ navigation }: Props) {
                     const errorData = JSON.parse(responseText);
                     errorDetail = errorData.detail || errorDetail;
                 } catch (e) {
-                    console.log('Could not parse error response as JSON');
+                    // CWE-532 mitigation: no sensitive data logging
                 }
                 throw new Error(errorDetail);
             }
-
-            const successData = JSON.parse(responseText);
-            console.log('Success response:', JSON.stringify(successData, null, 2));
 
             Alert.alert(
                 'Success!',
@@ -131,10 +121,8 @@ export function SignupScreen({ navigation }: Props) {
                 ]
             );
         } catch (error) {
-            console.log('=== SIGNUP ERROR ===');
-            console.log('Error type:', error?.constructor?.name);
-            console.log('Error message:', error instanceof Error ? error.message : String(error));
-            console.log('Full error:', error);
+            // CWE-532 mitigation: sanitized error logging without sensitive data
+            console.error('Registration failed');
 
             Alert.alert(
                 'Registration Failed',
@@ -142,7 +130,6 @@ export function SignupScreen({ navigation }: Props) {
             );
         } finally {
             setIsLoading(false);
-            console.log('=== SIGNUP COMPLETE ===');
         }
     };
 
