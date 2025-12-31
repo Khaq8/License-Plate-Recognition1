@@ -100,36 +100,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
 
-      // TODO: Remove hardcoded credentials before production
-      // Test credentials: admin:1234 (full access) | user:1234 (limited access)
-      if ((email === 'admin' || email === 'user') && password === '1234') {
-        const isAdminUser = email === 'admin';
-        const user: User = {
-          id: isAdminUser ? '1' : '2',
-          email: isAdminUser ? 'admin@parkinglot.com' : 'user@parkinglot.com',
-          name: isAdminUser ? 'Admin' : 'User',
-          role: isAdminUser ? 'admin' : 'user',
-        };
-        const testToken = `test-token-${email}`;
+      // // TODO: Remove hardcoded credentials before production
+      // // Test credentials: admin:1234 (full access) | user:1234 (limited access)
+      // if ((email === 'admin' || email === 'user') && password === '1234') {
+      //   const isAdminUser = email === 'admin';
+      //   const user: User = {
+      //     id: isAdminUser ? '1' : '2',
+      //     email: isAdminUser ? 'admin@parkinglot.com' : 'user@parkinglot.com',
+      //     name: isAdminUser ? 'Admin' : 'User',
+      //     role: isAdminUser ? 'admin' : 'user',
+      //   };
+      //   const testToken = `test-token-${email}`;
 
-        await SecureStore.setItemAsync(STORAGE_KEYS.AUTH_TOKEN, testToken);
-        await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+      //   await SecureStore.setItemAsync(STORAGE_KEYS.AUTH_TOKEN, testToken);
+      //   await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
 
-        dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token: testToken } });
-        return { success: true };
-      }
+      //   dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token: testToken } });
+      //   return { success: true };
+      // }
 
-      // Create form data for OAuth2 password flow
-      const formData = new URLSearchParams();
-      formData.append('username', email);
-      formData.append('password', password);
-
-      const response = await fetch(`${API_BASE_URL}/login`, {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: formData.toString(),
+        body: JSON.stringify({ email, password }),
       });
 
       if (!response.ok) {
@@ -139,12 +134,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const data: LoginResponse = await response.json();
 
-      // Create user object from email (you might want to fetch user details from another endpoint)
+      // Use user data from login response
       const user: User = {
-        id: '1',
-        email: email,
-        name: email.split('@')[0],
-        role: 'admin',
+        id: data.user?.id || '1',
+        email: data.user?.email || email,
+        name: data.user?.username || email.split('@')[0],
+        role: data.user?.is_admin ? 'admin' : 'user',
       };
 
       // Store token and user data securely

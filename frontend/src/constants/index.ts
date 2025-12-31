@@ -1,5 +1,6 @@
-// API Configuration
-export const API_BASE_URL = 'http://192.168.8.134:8000';
+// API Configuration - Auto-detects development server IP
+// In production, update PRODUCTION_API_URL in utils/apiConfig.ts
+export { API_BASE_URL } from '../utils/apiConfig';
 export const USE_MOCK_DATA = false; // Set to true to bypass backend and use mock data
 
 // Parking lot configuration

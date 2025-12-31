@@ -5,7 +5,7 @@ Handles parking session management using Supabase.
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel, constr
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from datetime import datetime, timezone
 from decimal import Decimal
 import math
@@ -83,6 +83,106 @@ def get_duration_minutes(entry_time: datetime, exit_time: datetime = None) -> in
         end_time = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
     duration = end_time - entry_time
     return int(duration.total_seconds() / 60)
+
+
+def charge_owners_by_priority(
+    supabase,
+    plate: str,
+    amount: Decimal,
+    session_id: int,
+    lot_name: str
+) -> Tuple[Optional[str], Decimal, str]:
+    """
+    Charge owners in priority order (1 -> 2 -> 3).
+    First owner with sufficient balance gets charged.
+
+    Returns: (charged_user_id, amount_charged, message)
+    """
+    # Get all owners ordered by priority
+    owners_result = supabase.table("cars").select(
+        "id, user_id, owner_priority"
+    ).eq("license_plate", plate.upper()).order("owner_priority").execute()
+
+    if not owners_result.data:
+        return None, Decimal("0"), "No registered owner found for this plate"
+
+    charged_user_id = None
+    charge_message = ""
+
+    for owner in owners_result.data:
+        user_id = owner["user_id"]
+        priority = owner["owner_priority"]
+
+        # Get user's current balance
+        profile = supabase.table("profiles").select(
+            "credit_balance, username"
+        ).eq("id", user_id).single().execute()
+
+        if not profile.data:
+            continue
+
+        balance = Decimal(str(profile.data["credit_balance"]))
+        username = profile.data.get("username", "Unknown")
+
+        if balance >= amount:
+            # Sufficient balance - charge this owner
+            new_balance = balance - amount
+
+            # Update balance
+            supabase.table("profiles").update({
+                "credit_balance": float(new_balance)
+            }).eq("id", user_id).execute()
+
+            # Create transaction record
+            supabase.table("transactions").insert({
+                "user_id": user_id,
+                "session_id": session_id,
+                "amount": -float(amount),
+                "type": "payment",
+                "balance_after": float(new_balance),
+                "description": f"Parking at {lot_name} (Owner priority {priority})"
+            }).execute()
+
+            charged_user_id = user_id
+            charge_message = f"Charged {username} (priority {priority}): ${amount:.2f}"
+            break
+        else:
+            # Insufficient balance, try next owner
+            charge_message = f"Owner {priority} ({username}) has insufficient balance (${balance:.2f})"
+
+    if not charged_user_id:
+        # No owner had sufficient balance - charge the first owner anyway (negative balance)
+        first_owner = owners_result.data[0]
+        user_id = first_owner["user_id"]
+
+        profile = supabase.table("profiles").select(
+            "credit_balance, username"
+        ).eq("id", user_id).single().execute()
+
+        if profile.data:
+            balance = Decimal(str(profile.data["credit_balance"]))
+            username = profile.data.get("username", "Unknown")
+            new_balance = balance - amount
+
+            # Update balance (will go negative)
+            supabase.table("profiles").update({
+                "credit_balance": float(new_balance)
+            }).eq("id", user_id).execute()
+
+            # Create transaction record
+            supabase.table("transactions").insert({
+                "user_id": user_id,
+                "session_id": session_id,
+                "amount": -float(amount),
+                "type": "payment",
+                "balance_after": float(new_balance),
+                "description": f"Parking at {lot_name} (insufficient balance - primary owner charged)"
+            }).execute()
+
+            charged_user_id = user_id
+            charge_message = f"All owners had insufficient balance. Charged {username} (priority 1): ${amount:.2f} (balance now ${new_balance:.2f})"
+
+    return charged_user_id, amount, charge_message
 
 
 # ============== Endpoints ==============
@@ -201,7 +301,7 @@ async def record_exit(
     session = session_result.data
 
     # Get lot for pricing
-    lot = supabase.table("parking_lots").select("hourly_rate").eq("id", lot_id).single().execute()
+    lot = supabase.table("parking_lots").select("name, hourly_rate").eq("id", lot_id).single().execute()
 
     # Calculate charge
     exit_time = datetime.now(timezone.utc)
@@ -218,6 +318,24 @@ async def record_exit(
         "status": "completed"
     }).eq("id", session["id"]).execute()
 
+    updated_session = update_result.data[0]
+
+    # Charge owners by priority (first with sufficient balance, or fallback to primary)
+    charged_user_id, _, _ = charge_owners_by_priority(
+        supabase,
+        plate,
+        amount,
+        updated_session["id"],
+        lot.data["name"]
+    )
+
+    # Update session with the charged user if different from original
+    if charged_user_id and charged_user_id != session.get("user_id"):
+        supabase.table("parking_sessions").update({
+            "user_id": charged_user_id
+        }).eq("id", updated_session["id"]).execute()
+        updated_session["user_id"] = charged_user_id
+
     # Clear plate seen marker
     await redis_cache.clear_plate_seen(plate, lot_id)
 
@@ -225,8 +343,10 @@ async def record_exit(
     await redis_cache.invalidate_lot(lot_id)
     if session.get("user_id"):
         await redis_cache.clear_user_active_session(session["user_id"])
+    if charged_user_id and charged_user_id != session.get("user_id"):
+        await redis_cache.clear_user_active_session(charged_user_id)
 
-    return ParkingSessionResponse(**update_result.data[0])
+    return ParkingSessionResponse(**updated_session)
 
 
 @router.post("/sessions/{session_id}/force-checkout", response_model=ForceCheckoutResponse)
@@ -272,41 +392,36 @@ async def force_checkout(
         "is_force_checkout": True
     }).eq("id", session_id).execute()
 
-    # If there's a user, deduct from their credit
-    if session.get("user_id"):
-        # Get current balance
-        profile = supabase.table("profiles").select("credit_balance").eq(
-            "id", session["user_id"]
-        ).single().execute()
+    updated_session = update_result.data[0]
 
-        if profile.data:
-            new_balance = float(profile.data["credit_balance"]) - float(amount)
+    # Charge owners by priority (first with sufficient balance, or fallback to primary)
+    charged_user_id, _, charge_message = charge_owners_by_priority(
+        supabase,
+        session["plate"],
+        amount,
+        session_id,
+        f"{lot.data['name']} (Force checkout)"
+    )
 
-            # Update balance
-            supabase.table("profiles").update({
-                "credit_balance": new_balance
-            }).eq("id", session["user_id"]).execute()
-
-            # Create transaction record
-            supabase.table("transactions").insert({
-                "user_id": session["user_id"],
-                "session_id": session_id,
-                "amount": -float(amount),
-                "type": "payment",
-                "balance_after": new_balance,
-                "description": f"Force checkout from {lot.data['name']}"
-            }).execute()
+    # Update session with the charged user if we found one
+    if charged_user_id:
+        supabase.table("parking_sessions").update({
+            "user_id": charged_user_id
+        }).eq("id", session_id).execute()
+        updated_session["user_id"] = charged_user_id
 
     # Clear caches
     await redis_cache.clear_plate_seen(session["plate"], session["lot_id"])
     await redis_cache.invalidate_lot(session["lot_id"])
     if session.get("user_id"):
         await redis_cache.clear_user_active_session(session["user_id"])
+    if charged_user_id and charged_user_id != session.get("user_id"):
+        await redis_cache.clear_user_active_session(charged_user_id)
 
     return ForceCheckoutResponse(
-        session=ParkingSessionResponse(**update_result.data[0]),
+        session=ParkingSessionResponse(**updated_session),
         amount_charged=amount,
-        message=f"Vehicle {session['plate']} has been force checked out. Charged: ${amount:.2f}"
+        message=f"Vehicle {session['plate']} force checked out. {charge_message}"
     )
 
 

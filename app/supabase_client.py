@@ -1,15 +1,22 @@
 """
 Supabase Client Module for License Plate Recognition System
 Provides singleton Supabase client instances for the FastAPI backend.
+
+Uses settings from config.py which loads from .env file:
+- SUPABASE_URL
+- SUPABASE_ANON_KEY
+- SUPABASE_SERVICE_ROLE_KEY
+- SUPABASE_JWT_SECRET (optional)
 """
 
 from supabase import create_client, Client
 from functools import lru_cache
 from typing import Optional
-import os
-from dotenv import load_dotenv
+import logging
 
-load_dotenv()
+from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class SupabaseClients:
@@ -22,41 +29,38 @@ class SupabaseClients:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
+            logger.info("Initializing Supabase clients...")
+            logger.info(f"Supabase URL: {settings.supabase_url[:50]}..." if len(settings.supabase_url) > 50 else f"Supabase URL: {settings.supabase_url}")
         return cls._instance
 
     @property
     def url(self) -> str:
-        url = os.getenv("SUPABASE_URL")
-        if not url:
-            raise ValueError("SUPABASE_URL environment variable is not set")
-        return url
+        return settings.supabase_url
 
     @property
     def anon_key(self) -> str:
-        key = os.getenv("SUPABASE_ANON_KEY")
-        if not key:
-            raise ValueError("SUPABASE_ANON_KEY environment variable is not set")
-        return key
+        return settings.supabase_anon_key
 
     @property
     def service_role_key(self) -> str:
-        key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-        if not key:
-            raise ValueError("SUPABASE_SERVICE_ROLE_KEY environment variable is not set")
-        return key
+        return settings.supabase_service_role_key
 
     @property
     def client(self) -> Client:
         """Get the anonymous/authenticated client (uses anon key)."""
         if self._client is None:
+            logger.info("Creating Supabase client with anon key...")
             self._client = create_client(self.url, self.anon_key)
+            logger.info("Supabase client created successfully")
         return self._client
 
     @property
     def admin_client(self) -> Client:
         """Get the admin client (uses service role key) - bypasses RLS."""
         if self._admin_client is None:
+            logger.info("Creating Supabase admin client with service role key...")
             self._admin_client = create_client(self.url, self.service_role_key)
+            logger.info("Supabase admin client created successfully")
         return self._admin_client
 
     def get_client_with_token(self, access_token: str) -> Client:

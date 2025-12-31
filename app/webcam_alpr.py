@@ -2,14 +2,18 @@
 Live Webcam License Plate Recognition System
 This script captures license plates from a webcam in real-time and stores
 the results in JSON files (one per session).
+
+Integrates with the parking management API to record entry/exit events.
 """
 import json
 import os
+import argparse
 from datetime import datetime
 from pathlib import Path
 from time import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 import requests
 from app.routers import auth, plate, user, car, parking_lot, parking, admin
 from app.cache import redis_cache
@@ -44,6 +48,15 @@ app = FastAPI(
     description="Multi-lot parking management with ALPR",
     version="2.0.0",
     lifespan=lifespan
+)
+
+# CORS middleware - allow requests from React Native app
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Authentication & User routes
@@ -107,7 +120,7 @@ async def readiness_check():
 
 
 class WebcamALPR:
-    """Webcam-based ALPR system with JSON logging."""
+    """Webcam-based ALPR system with parking management integration."""
 
     def __init__(
         self,
@@ -116,7 +129,11 @@ class WebcamALPR:
         output_dir="alpr_sessions",
         min_confidence=0.7,
         duplicate_threshold=5.0,
-        api_url="http://127.0.0.1:8000/detections/",
+        api_base_url="http://127.0.0.1:8000",
+        lot_id=1,
+        mode="auto",
+        admin_email=None,
+        admin_password=None,
     ):
         """
         Initialize the webcam ALPR system.
@@ -127,6 +144,11 @@ class WebcamALPR:
             output_dir: Directory to store session JSON files
             min_confidence: Minimum confidence threshold for plate detection
             duplicate_threshold: Seconds to wait before recording same plate again
+            api_base_url: Base URL of the parking management API
+            lot_id: The parking lot ID this camera monitors
+            mode: Camera mode - 'entry', 'exit', or 'auto' (auto-detect based on active sessions)
+            admin_email: Admin email for API authentication
+            admin_password: Admin password for API authentication
         """
         print("Initializing ALPR system...")
         self.alpr = ALPR(detector_model=detector_model, ocr_model=ocr_model)
@@ -134,7 +156,17 @@ class WebcamALPR:
         self.output_dir.mkdir(exist_ok=True)
         self.min_confidence = min_confidence
         self.duplicate_threshold = duplicate_threshold
-        self.api_url = api_url
+        self.api_base_url = api_base_url
+        self.lot_id = lot_id
+        self.mode = mode
+        self.auth_token = None
+
+        # Authenticate with the API
+        if admin_email and admin_password:
+            self._authenticate(admin_email, admin_password)
+        else:
+            print("WARNING: No admin credentials provided. API calls will fail.")
+            print("Use --email and --password arguments to authenticate.")
 
         # Create session file
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -143,8 +175,56 @@ class WebcamALPR:
         # Session data
         self.detected_plates = []
         self.last_seen = {}  # Track last time each plate was seen
+        self.active_plates = set()  # Track plates currently in the lot
+
+        # Load active sessions from API
+        self._load_active_sessions()
 
         print(f"Session file: {self.session_file}")
+        print(f"Monitoring lot ID: {self.lot_id}")
+        print(f"Mode: {self.mode}")
+
+    def _authenticate(self, email, password):
+        """Authenticate with the API and get access token."""
+        try:
+            response = requests.post(
+                f"{self.api_base_url}/auth/login",
+                json={"email": email, "password": password},
+                timeout=10
+            )
+            if response.status_code == 200:
+                data = response.json()
+                self.auth_token = data.get("access_token")
+                print(f"✓ Authenticated as {email}")
+            else:
+                print(f"✗ Authentication failed: {response.text}")
+        except Exception as e:
+            print(f"✗ Authentication error: {e}")
+
+    def _get_auth_headers(self):
+        """Get authorization headers for API requests."""
+        if self.auth_token:
+            return {"Authorization": f"Bearer {self.auth_token}"}
+        return {}
+
+    def _load_active_sessions(self):
+        """Load currently active parking sessions from the API."""
+        if not self.auth_token:
+            return
+        try:
+            response = requests.get(
+                f"{self.api_base_url}/lots/{self.lot_id}/active",
+                headers=self._get_auth_headers(),
+                timeout=10
+            )
+            if response.status_code == 200:
+                sessions = response.json()
+                self.active_plates = {s["plate"].upper() for s in sessions}
+                print(f"✓ Loaded {len(self.active_plates)} active sessions")
+            else:
+                print(f"✗ Could not load active sessions: {response.status_code}")
+        except Exception as e:
+            print(f"✗ Error loading active sessions: {e}")
 
     def is_duplicate(self, plate_text):
         """
@@ -165,7 +245,7 @@ class WebcamALPR:
 
     def save_detection(self, plate_text, confidence, detection_confidence):
         """
-        Save a plate detection to the session file.
+        Save a plate detection and record entry/exit via API.
 
         Args:
             plate_text: The detected plate text
@@ -174,6 +254,11 @@ class WebcamALPR:
         """
         # Update last seen time
         self.last_seen[plate_text] = time()
+        plate_upper = plate_text.upper()
+
+        # Determine if this is an entry or exit
+        is_entry = self._determine_entry_or_exit(plate_upper)
+        action = "entry" if is_entry else "exit"
 
         # Create detection record
         detection = {
@@ -181,42 +266,111 @@ class WebcamALPR:
             "plate": plate_text,
             "ocr_confidence": round(confidence, 4),
             "detection_confidence": round(detection_confidence, 4),
+            "action": action,
+            "lot_id": self.lot_id,
         }
 
         self.detected_plates.append(detection)
 
-        # Save to file
+        # Save to local JSON file (backup)
         with open(self.session_file, "w") as f:
-         json.dump(
+            json.dump(
                 {
                     "session_id": self.session_id,
                     "session_start": self.detected_plates[0]["timestamp"],
                     "total_detections": len(self.detected_plates),
+                    "lot_id": self.lot_id,
                     "detections": self.detected_plates,
                 },
                 f,
                 indent=2,
             )
 
-        # Send to FastAPI Database
-        try:
-            response = requests.post(
-                self.api_url,
-                params=dict(
-                    session_id=self.session_id,
-                    plate=plate_text,
-                    ocr_conf=confidence,
-                    det_conf=detection_confidence,
-                ),
-            )
-            if response.status_code == 200:
-                print(f"✓ DB Saved: {plate_text}")
-            else:
-                print("✗ Failed to save to DB", response.text)
-        except Exception as e:
-            print("✗ Database error:", e)
+        # Send to Parking Management API
+        if self.auth_token:
+            self._record_parking_event(plate_upper, confidence, is_entry)
+        else:
+            print(f"⚠ Skipping API (not authenticated): {plate_text}")
 
-        print(f"✓ JSON Saved: {plate_text} (OCR: {confidence:.2%}, Det: {detection_confidence:.2%})")
+        print(f"✓ {action.upper()}: {plate_text} (OCR: {confidence:.2%}, Det: {detection_confidence:.2%})")
+
+    def _determine_entry_or_exit(self, plate_text):
+        """
+        Determine if the detected plate is entering or exiting.
+
+        Args:
+            plate_text: The plate text (uppercase)
+
+        Returns:
+            True if entry, False if exit
+        """
+        if self.mode == "entry":
+            return True
+        elif self.mode == "exit":
+            return False
+        else:  # auto mode
+            # If plate has an active session, this is an exit
+            # Otherwise, this is an entry
+            return plate_text not in self.active_plates
+
+    def _record_parking_event(self, plate_text, confidence, is_entry):
+        """
+        Record entry or exit via the parking management API.
+
+        Args:
+            plate_text: The plate text
+            confidence: OCR confidence score
+            is_entry: True for entry, False for exit
+        """
+        try:
+            if is_entry:
+                # Record entry
+                response = requests.post(
+                    f"{self.api_base_url}/parking/{self.lot_id}/entry",
+                    headers={
+                        **self._get_auth_headers(),
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "plate": plate_text,
+                        "entry_confidence": confidence,
+                    },
+                    timeout=10
+                )
+                if response.status_code == 201:
+                    self.active_plates.add(plate_text)
+                    print(f"✓ API Entry recorded: {plate_text}")
+                elif response.status_code == 400:
+                    error = response.json().get("detail", "Unknown error")
+                    print(f"⚠ Entry rejected: {error}")
+                else:
+                    print(f"✗ Entry failed ({response.status_code}): {response.text}")
+            else:
+                # Record exit
+                response = requests.post(
+                    f"{self.api_base_url}/parking/{self.lot_id}/exit",
+                    headers=self._get_auth_headers(),
+                    params={
+                        "plate": plate_text,
+                        "exit_confidence": confidence,
+                    },
+                    timeout=10
+                )
+                if response.status_code == 200:
+                    self.active_plates.discard(plate_text)
+                    data = response.json()
+                    amount = data.get("amount_charged", 0)
+                    print(f"✓ API Exit recorded: {plate_text} (charged: ${amount:.2f})")
+                elif response.status_code == 404:
+                    print(f"⚠ Exit rejected: No active session for {plate_text}")
+                    # Maybe this is actually an entry - add to active plates
+                    if self.mode == "auto":
+                        print(f"  → Treating as entry instead")
+                        self._record_parking_event(plate_text, confidence, is_entry=True)
+                else:
+                    print(f"✗ Exit failed ({response.status_code}): {response.text}")
+        except Exception as e:
+            print(f"✗ API error: {e}")
 
 
     def run(self, camera_index=0):
@@ -247,7 +401,7 @@ class WebcamALPR:
         print("=" * 60)
 
         frame_count = 0
-        process_every_n_frames = 5  # Process every 5th frame for performance
+        process_every_n_frames = 10  # Process every 5th frame for performance
 
         try:
             while True:
@@ -356,21 +510,104 @@ class WebcamALPR:
 
 
 def main():
-    """Main entry point."""
+    """Main entry point with CLI argument parsing."""
+    parser = argparse.ArgumentParser(
+        description="FastALPR - Live Webcam License Plate Recognition with Parking Management",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Run with authentication (recommended)
+  python -m app.webcam_alpr --email admin@example.com --password secret --lot-id 1
+
+  # Run in entry-only mode (camera at entrance)
+  python -m app.webcam_alpr --email admin@example.com --password secret --lot-id 1 --mode entry
+
+  # Run in exit-only mode (camera at exit)
+  python -m app.webcam_alpr --email admin@example.com --password secret --lot-id 1 --mode exit
+
+  # Run without API integration (JSON backup only)
+  python -m app.webcam_alpr --lot-id 1
+
+Modes:
+  auto   - Automatically detect entry/exit based on active sessions (default)
+  entry  - All detections are treated as entries
+  exit   - All detections are treated as exits
+        """
+    )
+
+    parser.add_argument(
+        "--email", "-e",
+        help="Admin email for API authentication",
+        default=os.environ.get("ALPR_ADMIN_EMAIL")
+    )
+    parser.add_argument(
+        "--password", "-p",
+        help="Admin password for API authentication",
+        default=os.environ.get("ALPR_ADMIN_PASSWORD")
+    )
+    parser.add_argument(
+        "--lot-id", "-l",
+        type=int,
+        default=1,
+        help="Parking lot ID to monitor (default: 1)"
+    )
+    parser.add_argument(
+        "--mode", "-m",
+        choices=["auto", "entry", "exit"],
+        default="auto",
+        help="Camera mode: auto, entry, or exit (default: auto)"
+    )
+    parser.add_argument(
+        "--camera", "-c",
+        type=int,
+        default=0,
+        help="Camera index to use (default: 0)"
+    )
+    parser.add_argument(
+        "--api-url", "-u",
+        default=os.environ.get("API_BASE_URL", "http://127.0.0.1:8000"),
+        help="Base URL of the parking API (default: http://127.0.0.1:8000)"
+    )
+    parser.add_argument(
+        "--confidence", "-C",
+        type=float,
+        default=0.7,
+        help="Minimum detection confidence threshold (default: 0.7)"
+    )
+    parser.add_argument(
+        "--duplicate-threshold", "-d",
+        type=float,
+        default=5.0,
+        help="Seconds to wait before recording same plate again (default: 5.0)"
+    )
+    parser.add_argument(
+        "--output-dir", "-o",
+        default="alpr_sessions",
+        help="Directory to store session JSON files (default: alpr_sessions)"
+    )
+
+    args = parser.parse_args()
+
     print("=" * 60)
     print("FastALPR - Live Webcam License Plate Recognition")
+    print("with Parking Management Integration")
     print("=" * 60)
 
     # Initialize and run webcam ALPR
     webcam_alpr = WebcamALPR(
         detector_model="yolo-v9-t-384-license-plate-end2end",
         ocr_model="cct-xs-v1-global-model",
-        output_dir="alpr_sessions",
-        min_confidence=0.7,  # Minimum detection confidence
-        duplicate_threshold=5.0,  # Don't record same plate within 5 seconds
+        output_dir=args.output_dir,
+        min_confidence=args.confidence,
+        duplicate_threshold=args.duplicate_threshold,
+        api_base_url=args.api_url,
+        lot_id=args.lot_id,
+        mode=args.mode,
+        admin_email=args.email,
+        admin_password=args.password,
     )
 
-    webcam_alpr.run(camera_index=0)
+    webcam_alpr.run(camera_index=args.camera)
 
 
 if __name__ == "__main__":

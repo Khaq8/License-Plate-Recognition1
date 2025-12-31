@@ -28,6 +28,8 @@ class ParkingLotCreate(BaseModel):
     city: Optional[str] = None
     capacity: int = Field(..., gt=0)
     hourly_rate: Decimal = Field(default=Decimal("1.00"), ge=0)
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
 
 
 class ParkingLotUpdate(BaseModel):
@@ -37,6 +39,8 @@ class ParkingLotUpdate(BaseModel):
     capacity: Optional[int] = Field(None, gt=0)
     hourly_rate: Optional[Decimal] = Field(None, ge=0)
     is_active: Optional[bool] = None
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
 
 
 class ParkingLotResponse(BaseModel):
@@ -47,6 +51,8 @@ class ParkingLotResponse(BaseModel):
     capacity: int
     hourly_rate: Decimal
     is_active: bool
+    latitude: Optional[float]
+    longitude: Optional[float]
     created_at: datetime
 
 
@@ -99,7 +105,9 @@ async def create_parking_lot(
         "address": lot.address,
         "city": lot.city,
         "capacity": lot.capacity,
-        "hourly_rate": float(lot.hourly_rate)
+        "hourly_rate": float(lot.hourly_rate),
+        "latitude": lot.latitude,
+        "longitude": lot.longitude
     }).execute()
 
     if not result.data:

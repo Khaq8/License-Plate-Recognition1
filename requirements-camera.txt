@@ -1,0 +1,28 @@
+# ============================================================
+# Requirements for running the ALPR Camera Script locally
+# ============================================================
+#
+# The camera script needs OpenCV WITH GUI support (not headless)
+# to display the webcam feed. Install this on your host machine:
+#
+#   pip install -r requirements-camera.txt
+#
+# Then run the camera:
+#   python -m app.webcam_alpr -e admin@example.com -p secret -l 1
+#
+# ============================================================
+
+# OpenCV with GUI support (for webcam display)
+opencv-python>=4.8.0
+
+# ALPR models
+fast-alpr>=0.1.0
+fast-plate-ocr>=0.1.0
+open-image-models>=0.1.0
+onnxruntime>=1.16.0
+
+# HTTP client (for API calls)
+requests>=2.31.0
+
+# Utilities
+numpy>=1.24.0

@@ -40,7 +40,49 @@ class CarResponse(BaseModel):
     model: Optional[str]
     color: Optional[str]
     is_primary: bool
+    owner_priority: int
     created_at: datetime
+
+
+class CarOwnerInfo(BaseModel):
+    """Info about a car owner for shared cars."""
+    car_id: int
+    user_id: str
+    username: Optional[str]
+    owner_priority: int
+    credit_balance: float
+
+
+# ============== Helper Functions ==============
+
+def get_owners_by_priority(supabase, license_plate: str) -> List[dict]:
+    """
+    Get all owners of a license plate ordered by priority.
+    Returns list of dicts with car_id, user_id, owner_priority, and credit_balance.
+    """
+    result = supabase.table("cars").select(
+        "id, user_id, owner_priority"
+    ).eq("license_plate", license_plate.upper()).order("owner_priority").execute()
+
+    if not result.data:
+        return []
+
+    owners = []
+    for car in result.data:
+        # Get user's credit balance
+        profile = supabase.table("profiles").select(
+            "credit_balance, username"
+        ).eq("id", car["user_id"]).single().execute()
+
+        owners.append({
+            "car_id": car["id"],
+            "user_id": car["user_id"],
+            "owner_priority": car["owner_priority"],
+            "credit_balance": float(profile.data["credit_balance"]) if profile.data else 0.0,
+            "username": profile.data["username"] if profile.data else None
+        })
+
+    return owners
 
 
 # ============== Endpoints ==============
@@ -52,19 +94,41 @@ async def register_car(
 ):
     """
     Register a new car for the authenticated user.
+    Supports up to 3 owners per license plate with priority-based charging.
     """
     supabase = get_supabase_admin()
+    plate = car.license_plate.upper()
 
-    # Check if the license plate already exists globally
-    existing = supabase.table("cars").select("id").eq(
-        "license_plate", car.license_plate.upper()
-    ).execute()
+    # Check if this user already registered this plate
+    user_existing = supabase.table("cars").select("id").eq(
+        "license_plate", plate
+    ).eq("user_id", current_user.id).execute()
 
-    if existing.data:
+    if user_existing.data:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A car with this license plate is already registered"
+            detail="You have already registered this license plate"
         )
+
+    # Get all existing owners for this plate to determine priority
+    existing_owners = supabase.table("cars").select(
+        "owner_priority"
+    ).eq("license_plate", plate).order("owner_priority").execute()
+
+    # Check max 3 owners
+    if len(existing_owners.data) >= 3:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This license plate already has the maximum of 3 owners"
+        )
+
+    # Assign next available priority (1, 2, or 3)
+    used_priorities = {row["owner_priority"] for row in existing_owners.data}
+    owner_priority = 1
+    for p in [1, 2, 3]:
+        if p not in used_priorities:
+            owner_priority = p
+            break
 
     # If this is marked as primary, unset other primary cars for this user
     if car.is_primary:
@@ -75,11 +139,12 @@ async def register_car(
     # Create new car
     result = supabase.table("cars").insert({
         "user_id": current_user.id,
-        "license_plate": car.license_plate.upper(),
+        "license_plate": plate,
         "brand": car.brand,
         "model": car.model,
         "color": car.color,
-        "is_primary": car.is_primary
+        "is_primary": car.is_primary,
+        "owner_priority": owner_priority
     }).execute()
 
     if not result.data:
@@ -227,3 +292,60 @@ async def set_primary_car(
     ).execute()
 
     return CarResponse(**result.data[0])
+
+
+@router.get("/{car_id}/co-owners", response_model=List[CarOwnerInfo])
+async def get_car_co_owners(
+    car_id: int,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Get all co-owners of a car (by license plate).
+    Only accessible if the current user owns the car.
+    """
+    supabase = get_supabase_admin()
+
+    # Get the car and verify ownership
+    car = supabase.table("cars").select("license_plate").eq("id", car_id).eq(
+        "user_id", current_user.id
+    ).single().execute()
+
+    if not car.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Car not found"
+        )
+
+    # Get all owners
+    owners = get_owners_by_priority(supabase, car.data["license_plate"])
+
+    return [CarOwnerInfo(**owner) for owner in owners]
+
+
+@router.get("/plate/{license_plate}/owners", response_model=List[CarOwnerInfo])
+async def get_plate_owners(
+    license_plate: str,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Get all owners of a license plate.
+    Only accessible if the current user is one of the owners.
+    """
+    supabase = get_supabase_admin()
+    plate = license_plate.upper()
+
+    # Verify current user owns this plate
+    user_car = supabase.table("cars").select("id").eq(
+        "license_plate", plate
+    ).eq("user_id", current_user.id).execute()
+
+    if not user_car.data:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not an owner of this license plate"
+        )
+
+    # Get all owners
+    owners = get_owners_by_priority(supabase, plate)
+
+    return [CarOwnerInfo(**owner) for owner in owners]

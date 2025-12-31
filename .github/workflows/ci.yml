@@ -1,0 +1,75 @@
+# ============================================================
+# CI Pipeline - Runs on every push and pull request
+# ============================================================
+
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  # ============== Lint Python Code ==============
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install linters
+        run: pip install ruff
+
+      - name: Run Ruff (linter)
+        run: ruff check app/ --output-format=github
+
+  # ============== Build Docker Image ==============
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false  # Don't push, just verify it builds
+          tags: lpr-api:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============== API Health Check ==============
+  api-test:
+    name: API Test
+    runs-on: ubuntu-latest
+    needs: docker-build  # Run after docker-build passes
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create test .env
+        run: |
+          cat > .env << EOF
+          SUPABASE_URL=https://test.supabase.co
+          SUPABASE_ANON_KEY=test-key
+          SUPABASE_SERVICE_ROLE_KEY=test-service-key
+          SECRET_KEY=test-secret-key
+          REDIS_URL=redis://redis:6379
+          EOF
+
+      - name: Start services
+        run: |
+          docker-compose up -d redis
+          sleep 5
+
+      - name: Check Redis is running
+        run: docker-compose exec -T redis redis-cli ping

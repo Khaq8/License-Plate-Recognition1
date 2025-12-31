@@ -24,6 +24,8 @@ export interface ParkingLot {
   capacity: number;
   hourly_rate: number;
   is_active: boolean;
+  latitude: number | null;
+  longitude: number | null;
   created_at: string;
 }
 
@@ -80,7 +82,15 @@ export interface ParkingStats {
 // API Response types
 export interface LoginResponse {
   access_token: string;
+  refresh_token: string;
   token_type: string;
+  expires_in: number;
+  user: {
+    id: string;
+    email: string;
+    username?: string;
+    is_admin?: boolean;
+  };
 }
 
 export interface PlateDetection {

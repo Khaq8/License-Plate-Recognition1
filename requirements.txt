@@ -38,3 +38,6 @@ numpy>=1.24.0
 
 # Type hints (development)
 types-requests>=2.31.0
+
+# PostgreSQL driver (required by Supabase Python client)
+psycopg2-binary>=2.9.0

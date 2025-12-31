@@ -1,9 +1,25 @@
 # ============================================================
 # License Plate Recognition System - Docker Compose
 # ============================================================
+#
+# Architecture:
+#   - api: FastAPI server (handles auth, parking sessions, lot management)
+#   - redis: Cache for lot status, duplicate detection, session caching
+#
+# The ALPR camera script runs OUTSIDE Docker on the host machine
+# because it needs webcam access. Run it with:
+#
+#   python -m app.webcam_alpr -e admin@example.com -p secret -l 1
+#
+# Or set environment variables:
+#   export ALPR_ADMIN_EMAIL=admin@example.com
+#   export ALPR_ADMIN_PASSWORD=secret
+#   python -m app.webcam_alpr --lot-id 1
+#
+# ============================================================
 
 services:
-  # FastAPI Backend
+  # FastAPI Backend (API server only - no webcam)
   api:
     build:
       context: .

@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import { useAuth } from '../contexts/AuthContext';
+import { LotProvider } from '../contexts/LotContext';
 import {
   LoginScreen,
   DashboardScreen,
@@ -72,6 +73,7 @@ function MainNavigator() {
   const { isAdmin } = useAuth();
 
   return (
+    <LotProvider>
     <MainTab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
@@ -120,6 +122,7 @@ function MainNavigator() {
         options={{ tabBarLabel: 'Settings' }}
       />
     </MainTab.Navigator>
+    </LotProvider>
   );
 }
 

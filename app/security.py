@@ -30,7 +30,8 @@ class CurrentUser(BaseModel):
     id: str
     email: Optional[str] = None
     username: Optional[str] = None
-    full_name: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     is_admin: bool = False
     credit_balance: float = 0.0
     phone: Optional[str] = None
@@ -115,7 +116,8 @@ async def get_current_user(
             id=profile["id"],
             email=profile.get("email"),
             username=profile.get("username"),
-            full_name=profile.get("full_name"),
+            first_name=profile.get("first_name"),
+            last_name=profile.get("last_name"),
             is_admin=profile.get("is_admin", False),
             credit_balance=float(profile.get("credit_balance", 0)),
             phone=profile.get("phone")
@@ -172,7 +174,8 @@ def get_optional_user(request: Request) -> Optional[CurrentUser]:
             id=profile["id"],
             email=profile.get("email"),
             username=profile.get("username"),
-            full_name=profile.get("full_name"),
+            first_name=profile.get("first_name"),
+            last_name=profile.get("last_name"),
             is_admin=profile.get("is_admin", False),
             credit_balance=float(profile.get("credit_balance", 0)),
             phone=profile.get("phone")

@@ -28,13 +28,10 @@ export function LoginScreen({ navigation }: Props) {
   const validateForm = (): boolean => {
     const newErrors: { email?: string; password?: string } = {};
 
-    // Allow test credentials (admin/user) to bypass email validation
-    const isTestUser = email === 'admin' || email === 'user';
-
     if (!email.trim()) {
-      newErrors.email = 'Username is required';
-    } else if (!isTestUser && !/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = 'Please enter a valid email';
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      newErrors.email = 'Please enter a valid email address';
     }
 
     if (!password) {
@@ -82,12 +79,13 @@ export function LoginScreen({ navigation }: Props) {
             </Text>
 
             <Input
-              label="Username"
-              placeholder="Enter username or email"
+              label="Email"
+              placeholder="Enter your email"
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
               autoCorrect={false}
+              keyboardType="email-address"
               error={errors.email}
             />
 

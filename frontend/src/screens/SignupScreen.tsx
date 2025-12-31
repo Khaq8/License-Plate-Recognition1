@@ -21,12 +21,15 @@ type Props = {
 export function SignupScreen({ navigation }: Props) {
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
-    const [fullName, setFullName] = useState('');
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [errors, setErrors] = useState<{
         username?: string;
         email?: string;
+        firstName?: string;
+        lastName?: string;
         password?: string;
         confirmPassword?: string;
     }>({});
@@ -41,8 +44,18 @@ export function SignupScreen({ navigation }: Props) {
             newErrors.username = 'Username must be at least 3 characters';
         }
 
-        if (email && !/\S+@\S+\.\S+/.test(email)) {
+        if (!email.trim()) {
+            newErrors.email = 'Email is required';
+        } else if (!/\S+@\S+\.\S+/.test(email)) {
             newErrors.email = 'Please enter a valid email';
+        }
+
+        if (!firstName.trim()) {
+            newErrors.firstName = 'First name is required';
+        }
+
+        if (!lastName.trim()) {
+            newErrors.lastName = 'Last name is required';
         }
 
         if (!password) {
@@ -63,24 +76,50 @@ export function SignupScreen({ navigation }: Props) {
         if (!validateForm()) return;
 
         setIsLoading(true);
+
+        const payload = {
+            username: username.trim(),
+            email: email.trim(),
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            password: password,
+        };
+
+        console.log('=== SIGNUP DEBUG ===');
+        console.log('API_BASE_URL:', API_BASE_URL);
+        console.log('Full URL:', `${API_BASE_URL}/auth/register`);
+        console.log('Payload:', JSON.stringify(payload, null, 2));
+
         try {
-            const response = await fetch(`${API_BASE_URL}/register`, {
+            console.log('Sending fetch request...');
+            const response = await fetch(`${API_BASE_URL}/auth/register`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    username: username.trim(),
-                    email: email.trim() || null,
-                    full_name: fullName.trim() || null,
-                    password: password,
-                }),
+                body: JSON.stringify(payload),
             });
 
+            console.log('Response status:', response.status);
+            console.log('Response ok:', response.ok);
+            console.log('Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
+
+            const responseText = await response.text();
+            console.log('Response body (raw):', responseText);
+
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Registration failed');
+                let errorDetail = 'Registration failed';
+                try {
+                    const errorData = JSON.parse(responseText);
+                    errorDetail = errorData.detail || errorDetail;
+                } catch (e) {
+                    console.log('Could not parse error response as JSON');
+                }
+                throw new Error(errorDetail);
             }
+
+            const successData = JSON.parse(responseText);
+            console.log('Success response:', JSON.stringify(successData, null, 2));
 
             Alert.alert(
                 'Success!',
@@ -93,12 +132,18 @@ export function SignupScreen({ navigation }: Props) {
                 ]
             );
         } catch (error) {
+            console.log('=== SIGNUP ERROR ===');
+            console.log('Error type:', error?.constructor?.name);
+            console.log('Error message:', error instanceof Error ? error.message : String(error));
+            console.log('Full error:', error);
+
             Alert.alert(
                 'Registration Failed',
                 error instanceof Error ? error.message : 'Please try again'
             );
         } finally {
             setIsLoading(false);
+            console.log('=== SIGNUP COMPLETE ===');
         }
     };
 
@@ -137,7 +182,7 @@ export function SignupScreen({ navigation }: Props) {
                         />
 
                         <Input
-                            label="Email (optional)"
+                            label="Email *"
                             placeholder="your.email@example.com"
                             value={email}
                             onChangeText={(text) => {
@@ -152,13 +197,38 @@ export function SignupScreen({ navigation }: Props) {
                             error={errors.email}
                         />
 
-                        <Input
-                            label="Full Name (optional)"
-                            placeholder="John Doe"
-                            value={fullName}
-                            onChangeText={setFullName}
-                            autoCapitalize="words"
-                        />
+                        <View style={styles.nameRow}>
+                            <View style={styles.nameField}>
+                                <Input
+                                    label="First Name *"
+                                    placeholder="John"
+                                    value={firstName}
+                                    onChangeText={(text) => {
+                                        setFirstName(text);
+                                        if (errors.firstName) {
+                                            setErrors({ ...errors, firstName: undefined });
+                                        }
+                                    }}
+                                    autoCapitalize="words"
+                                    error={errors.firstName}
+                                />
+                            </View>
+                            <View style={styles.nameField}>
+                                <Input
+                                    label="Last Name *"
+                                    placeholder="Doe"
+                                    value={lastName}
+                                    onChangeText={(text) => {
+                                        setLastName(text);
+                                        if (errors.lastName) {
+                                            setErrors({ ...errors, lastName: undefined });
+                                        }
+                                    }}
+                                    autoCapitalize="words"
+                                    error={errors.lastName}
+                                />
+                            </View>
+                        </View>
 
                         <Input
                             label="Password *"
@@ -267,6 +337,13 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 8,
         elevation: 3,
+    },
+    nameRow: {
+        flexDirection: 'row',
+        gap: SPACING.sm,
+    },
+    nameField: {
+        flex: 1,
     },
     signupButton: {
         marginTop: SPACING.md,
