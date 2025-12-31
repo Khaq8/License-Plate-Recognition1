@@ -3,7 +3,6 @@ import {
   View,
   Text,
   Modal,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   Alert,
@@ -13,7 +12,6 @@ import { Input } from './Input';
 import { Button } from './Button';
 import { Dropdown } from './Dropdown';
 import { CAR_BRANDS } from '../constants/carData';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../constants';
 import type { CreateCarRequest } from '../types';
 
 interface AddCarModalProps {
@@ -114,25 +112,27 @@ export function AddCarModal({ visible, onClose, onSubmit }: AddCarModalProps) {
       presentationStyle="pageSheet"
       onRequestClose={handleClose}
     >
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
         {/* Header */}
-        <View style={styles.header}>
+        <View className="flex-row justify-between items-start px-lg py-md border-b border-border bg-surface">
           <View>
-            <Text style={styles.title}>Add Your Car</Text>
-            <Text style={styles.subtitle}>Register your vehicle details</Text>
+            <Text className="text-xl font-bold text-text">Add Your Car</Text>
+            <Text className="text-sm text-text-secondary mt-xs">
+              Register your vehicle details
+            </Text>
           </View>
           <TouchableOpacity
             onPress={handleClose}
             disabled={isSubmitting}
-            style={styles.closeButton}
+            className="p-xs"
           >
-            <Text style={styles.closeButtonText}>✕</Text>
+            <Text className="text-2xl text-text-secondary font-light">✕</Text>
           </TouchableOpacity>
         </View>
 
         <ScrollView
-          style={styles.content}
-          contentContainerStyle={styles.scrollContent}
+          className="flex-1"
+          contentContainerStyle={{ padding: 24 }}
           showsVerticalScrollIndicator={false}
         >
           {/* License Plate Input */}
@@ -195,144 +195,26 @@ export function AddCarModal({ visible, onClose, onSubmit }: AddCarModalProps) {
           />
 
           {/* Info Box */}
-          <View style={styles.infoBox}>
-            <Text style={styles.infoIcon}>ℹ️</Text>
-            <Text style={styles.infoText}>
+          <View className="flex-row bg-primary/10 p-md rounded-md mt-md border-l-primary" style={{ borderLeftWidth: 3 }}>
+            <Text className="text-lg mr-sm">ℹ️</Text>
+            <Text className="flex-1 text-sm text-text" style={{ lineHeight: 20 }}>
               Your car information will be linked to your parking history for easier tracking.
             </Text>
           </View>
         </ScrollView>
 
         {/* Footer with Submit Button */}
-        <View style={styles.footer}>
+        <View className="p-lg border-t border-border bg-surface">
           <Button
             title="Register Car"
             onPress={handleSubmit}
             loading={isSubmitting}
             disabled={isSubmitting}
             size="large"
-            style={styles.submitButton}
+            className="w-full"
           />
         </View>
       </SafeAreaView>
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    backgroundColor: COLORS.surface,
-  },
-  title: {
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  subtitle: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    marginTop: SPACING.xs,
-  },
-  closeButton: {
-    padding: SPACING.xs,
-  },
-  closeButtonText: {
-    fontSize: FONT_SIZES.xxl,
-    color: COLORS.textSecondary,
-    fontWeight: '300',
-  },
-  content: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: SPACING.lg,
-  },
-  section: {
-    marginBottom: SPACING.lg,
-  },
-  sectionLabel: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginBottom: SPACING.sm,
-  },
-  errorText: {
-    color: COLORS.danger,
-    fontSize: FONT_SIZES.xs,
-    marginBottom: SPACING.xs,
-  },
-  typeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -SPACING.xs,
-  },
-  typeButton: {
-    width: '25%',
-    aspectRatio: 1,
-    padding: SPACING.sm,
-    margin: SPACING.xs,
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 2,
-    borderColor: COLORS.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  typeButtonSelected: {
-    borderColor: COLORS.primary,
-    backgroundColor: `${COLORS.primary}10`,
-  },
-  typeIcon: {
-    fontSize: 32,
-    marginBottom: SPACING.xs,
-  },
-  typeLabel: {
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '500',
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-  },
-  typeLabelSelected: {
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  infoBox: {
-    flexDirection: 'row',
-    backgroundColor: `${COLORS.primary}10`,
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.primary,
-    marginTop: SPACING.md,
-  },
-  infoIcon: {
-    fontSize: FONT_SIZES.lg,
-    marginRight: SPACING.sm,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.text,
-    lineHeight: 20,
-  },
-  footer: {
-    padding: SPACING.lg,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    backgroundColor: COLORS.surface,
-  },
-  submitButton: {
-    width: '100%',
-  },
-});

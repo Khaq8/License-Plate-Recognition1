@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, View, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, View, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -14,7 +14,6 @@ import {
   UserManagementScreen,
   SignupScreen,
 } from '../screens';
-import { COLORS, FONT_SIZES } from '../constants';
 
 // Type definitions for navigation
 export type RootStackParamList = {
@@ -81,18 +80,18 @@ function MainNavigator() {
         tabBarIcon: ({ focused }) => (
           <TabBarIcon name={route.name} focused={focused} />
         ),
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.textLight,
+        tabBarActiveTintColor: '#2563EB',
+        tabBarInactiveTintColor: '#94A3B8',
         tabBarStyle: {
-          backgroundColor: COLORS.surface,
+          backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
-          borderTopColor: COLORS.border,
+          borderTopColor: '#E2E8F0',
           height: 85,
           paddingTop: 8,
           paddingBottom: 25,
         },
         tabBarLabelStyle: {
-          fontSize: FONT_SIZES.xs,
+          fontSize: 12,
           fontWeight: '600' as const,
         },
       })}
@@ -129,8 +128,8 @@ function MainNavigator() {
 // Loading screen while checking auth state
 function LoadingScreen() {
   return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size={36} color={COLORS.primary} />
+    <View className="flex-1 justify-center items-center bg-background">
+      <ActivityIndicator size={36} color="#2563EB" />
     </View>
   );
 }
@@ -159,12 +158,3 @@ export function AppNavigator() {
     </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-  },
-});

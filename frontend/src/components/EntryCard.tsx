@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../constants';
+import { View, Text, Animated } from 'react-native';
+import { cn } from '../utils/cn';
 import { ParkingEntry } from '../types';
 
 interface EntryCardProps {
@@ -61,157 +61,81 @@ export function EntryCard({ entry, onPress }: EntryCardProps) {
   }, [isCheckedIn, pulseAnim]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.plateContainer}>
-          <Text style={styles.plateText}>{entry.plate}</Text>
+    <View
+      className="bg-surface rounded-lg p-md mb-md"
+      style={{
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 2,
+      }}
+    >
+      <View className="flex-row justify-between items-center mb-md">
+        <View className="bg-text px-md py-sm rounded-md">
+          <Text className="text-surface text-lg font-bold tracking-plate">
+            {entry.plate}
+          </Text>
         </View>
-        <View style={styles.statusContainer}>
+        <View className="flex-row items-center">
           {isCheckedIn && (
             <Animated.View
-              style={[
-                styles.pulsingDot,
-                { opacity: pulseAnim },
-              ]}
+              className="w-2 h-2 rounded-full bg-success mr-xs"
+              style={{ opacity: pulseAnim }}
             />
           )}
-          <View style={[styles.statusBadge, isCheckedIn ? styles.statusActive : styles.statusInactive]}>
-            <Text style={[styles.statusText, isCheckedIn ? styles.statusTextActive : styles.statusTextInactive]}>
+          <View
+            className={cn(
+              'px-md py-xs rounded-full',
+              isCheckedIn ? 'bg-success/20' : 'bg-secondary/20'
+            )}
+          >
+            <Text
+              className={cn(
+                'text-sm font-semibold',
+                isCheckedIn ? 'text-success' : 'text-secondary'
+              )}
+            >
               {isCheckedIn ? 'Parked' : 'Left'}
             </Text>
           </View>
         </View>
       </View>
 
-      <View style={styles.details}>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Check In</Text>
-          <Text style={styles.detailValue}>{formatDateTime(entry.checkInTime)}</Text>
+      <View className="border-t border-border pt-md">
+        <View className="flex-row justify-between mb-sm">
+          <Text className="text-sm text-text-secondary">Check In</Text>
+          <Text className="text-sm text-text font-medium">
+            {formatDateTime(entry.checkInTime)}
+          </Text>
         </View>
 
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Check Out</Text>
-          <Text style={styles.detailValue}>
+        <View className="flex-row justify-between mb-sm">
+          <Text className="text-sm text-text-secondary">Check Out</Text>
+          <Text className="text-sm text-text font-medium">
             {entry.checkOutTime ? formatDateTime(entry.checkOutTime) : '—'}
           </Text>
         </View>
 
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Duration</Text>
-          <Text style={[styles.detailValue, isCheckedIn && styles.durationActive]}>
+        <View className="flex-row justify-between mb-sm">
+          <Text className="text-sm text-text-secondary">Duration</Text>
+          <Text
+            className={cn(
+              'text-sm font-medium',
+              isCheckedIn ? 'text-success' : 'text-text'
+            )}
+          >
             {formatDuration(entry.checkInTime, entry.checkOutTime)}
           </Text>
         </View>
       </View>
 
-      <View style={styles.footer}>
-        <Text style={styles.confidence}>
+      <View className="flex-row justify-between mt-sm pt-sm border-t border-border">
+        <Text className="text-xs text-text-light">
           Confidence: {(entry.ocrConfidence * 100).toFixed(1)}%
         </Text>
-        <Text style={styles.sessionId}>Session: {entry.sessionId}</Text>
+        <Text className="text-xs text-text-light">Session: {entry.sessionId}</Text>
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.md,
-    marginBottom: SPACING.md,
-    shadowColor: COLORS.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  pulsingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.success,
-    marginRight: SPACING.xs,
-  },
-  plateContainer: {
-    backgroundColor: COLORS.text,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
-  },
-  plateText: {
-    color: COLORS.surface,
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '700',
-    letterSpacing: 2,
-  },
-  statusBadge: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  statusActive: {
-    backgroundColor: `${COLORS.success}20`,
-  },
-  statusInactive: {
-    backgroundColor: `${COLORS.secondary}20`,
-  },
-  statusText: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-  },
-  statusTextActive: {
-    color: COLORS.success,
-  },
-  statusTextInactive: {
-    color: COLORS.secondary,
-  },
-  details: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingTop: SPACING.md,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.sm,
-  },
-  detailLabel: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-  },
-  detailValue: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.text,
-    fontWeight: '500',
-  },
-  durationActive: {
-    color: COLORS.success,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: SPACING.sm,
-    paddingTop: SPACING.sm,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  confidence: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textLight,
-  },
-  sessionId: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textLight,
-  },
-});

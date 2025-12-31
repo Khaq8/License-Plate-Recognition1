@@ -5,12 +5,11 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
-  StyleSheet,
   TextInput,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../constants';
+import { cn } from '../utils/cn';
 
 interface DropdownProps {
   label: string;
@@ -43,18 +42,31 @@ export function Dropdown({
   };
 
   return (
-    <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
+    <View className="mb-md">
+      {label && (
+        <Text className="text-sm font-semibold text-text mb-sm">{label}</Text>
+      )}
       <TouchableOpacity
-        style={[styles.dropdown, error && styles.dropdownError]}
+        className={cn(
+          'flex-row items-center justify-between bg-surface border rounded-md px-md',
+          error ? 'border-danger' : 'border-border'
+        )}
+        style={{ height: 48 }}
         onPress={() => setIsOpen(true)}
       >
-        <Text style={[styles.dropdownText, !value && styles.placeholderText]}>
+        <Text
+          className={cn(
+            'text-md flex-1',
+            value ? 'text-text' : 'text-text-light'
+          )}
+        >
           {value || placeholder}
         </Text>
-        <Text style={styles.arrow}>▼</Text>
+        <Text className="text-xs text-text-secondary">▼</Text>
       </TouchableOpacity>
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {error && (
+        <Text className="text-danger text-xs mt-xs">{error}</Text>
+      )}
 
       <Modal
         visible={isOpen}
@@ -63,57 +75,69 @@ export function Dropdown({
         onRequestClose={() => setIsOpen(false)}
       >
         <KeyboardAvoidingView
-          style={styles.modalOverlay}
+          className="flex-1 justify-end"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={0}
         >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{label}</Text>
+          <View
+            className="bg-surface pb-xl"
+            style={{
+              borderTopLeftRadius: 16,
+              borderTopRightRadius: 16,
+              maxHeight: '80%',
+            }}
+          >
+            <View className="flex-row justify-between items-center p-lg border-b border-border">
+              <Text className="text-lg font-semibold text-text">{label}</Text>
               <TouchableOpacity onPress={() => setIsOpen(false)}>
-                <Text style={styles.closeButton}>✕</Text>
+                <Text className="text-xl text-text-secondary font-light">✕</Text>
               </TouchableOpacity>
             </View>
 
             <TextInput
-              style={styles.searchInput}
+              className="m-lg p-md bg-background rounded-md text-md text-text"
               placeholder="Search..."
-              placeholderTextColor={COLORS.textLight}
+              placeholderTextColor="#94A3B8"
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
 
             <ScrollView
-              style={styles.optionsList}
+              style={{ maxHeight: 400 }}
               keyboardShouldPersistTaps="handled"
             >
               {filteredOptions.length > 0 ? (
                 filteredOptions.map((option) => (
                   <TouchableOpacity
                     key={option}
-                    style={[
-                      styles.option,
-                      value === option && styles.selectedOption,
-                    ]}
+                    className={cn(
+                      'flex-row justify-between items-center px-lg py-md border-b border-border',
+                      value === option && 'bg-primary/10'
+                    )}
                     onPress={() => handleSelect(option)}
                   >
                     <Text
-                      style={[
-                        styles.optionText,
-                        value === option && styles.selectedOptionText,
-                      ]}
+                      className={cn(
+                        'text-md',
+                        value === option
+                          ? 'text-primary font-semibold'
+                          : 'text-text'
+                      )}
                     >
                       {option}
                     </Text>
                     {value === option && (
-                      <Text style={styles.checkmark}>✓</Text>
+                      <Text className="text-lg text-primary font-semibold">✓</Text>
                     )}
                   </TouchableOpacity>
                 ))
               ) : (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyStateText}>Brand not found</Text>
-                  <Text style={styles.emptyStateSubtext}>
+                <View className="p-xl items-center justify-center">
+                  <Text className="text-md font-semibold text-text-secondary mb-xs">
+                    Brand not found
+                  </Text>
+                  <Text className="text-sm text-text-light">
                     Try a different search term
                   </Text>
                 </View>
@@ -125,127 +149,3 @@ export function Dropdown({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: SPACING.md,
-  },
-  label: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginBottom: SPACING.sm,
-  },
-  dropdown: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    height: 48,
-  },
-  dropdownError: {
-    borderColor: COLORS.danger,
-  },
-  dropdownText: {
-    fontSize: FONT_SIZES.md,
-    color: COLORS.text,
-    flex: 1,
-  },
-  placeholderText: {
-    color: COLORS.textLight,
-  },
-  arrow: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
-  },
-  errorText: {
-    color: COLORS.danger,
-    fontSize: FONT_SIZES.xs,
-    marginTop: SPACING.xs,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: COLORS.surface,
-    borderTopLeftRadius: BORDER_RADIUS.xl,
-    borderTopRightRadius: BORDER_RADIUS.xl,
-    maxHeight: '80%',
-    paddingBottom: SPACING.xl,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  modalTitle: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  closeButton: {
-    fontSize: FONT_SIZES.xl,
-    color: COLORS.textSecondary,
-    fontWeight: '300',
-  },
-  searchInput: {
-    margin: SPACING.lg,
-    padding: SPACING.md,
-    backgroundColor: COLORS.background,
-    borderRadius: BORDER_RADIUS.md,
-    fontSize: FONT_SIZES.md,
-    color: COLORS.text,
-  },
-  optionsList: {
-    maxHeight: 400,
-  },
-  option: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  selectedOption: {
-    backgroundColor: `${COLORS.primary}10`,
-  },
-  optionText: {
-    fontSize: FONT_SIZES.md,
-    color: COLORS.text,
-  },
-  selectedOptionText: {
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  checkmark: {
-    fontSize: FONT_SIZES.lg,
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  emptyState: {
-    padding: SPACING.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyStateText: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.xs,
-  },
-  emptyStateSubtext: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textLight,
-  },
-});

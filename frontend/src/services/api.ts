@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL, STORAGE_KEYS } from '../constants';
-import { PlateDetection, ParkingEntry, ParkingStats, ParkingLot, ParkingLotStatus, ActiveUserInLot, ForceCheckoutResponse } from '../types';
+import { PlateDetection, ParkingEntry, ParkingStats, ParkingLot, ParkingLotStatus, ActiveUserInLot, ForceCheckoutResponse, Car, CreateCarRequest } from '../types';
 
 // Helper to get auth header
 async function getAuthHeader(): Promise<Record<string, string>> {
@@ -247,6 +247,49 @@ export const parkingApi = {
   // Force checkout a vehicle
   forceCheckout: async (sessionId: number): Promise<ForceCheckoutResponse> => {
     return fetchWithAuth<ForceCheckoutResponse>(`/parking/sessions/${sessionId}/force-checkout`, {
+      method: 'POST',
+    });
+  },
+};
+
+// Car management API calls
+export const carApi = {
+  // Get all cars for current user
+  getAll: async (): Promise<Car[]> => {
+    return fetchWithAuth<Car[]>('/cars/');
+  },
+
+  // Get a specific car by ID
+  getById: async (id: number): Promise<Car> => {
+    return fetchWithAuth<Car>(`/cars/${id}`);
+  },
+
+  // Create a new car
+  create: async (carData: CreateCarRequest): Promise<Car> => {
+    return fetchWithAuth<Car>('/cars/', {
+      method: 'POST',
+      body: JSON.stringify(carData),
+    });
+  },
+
+  // Update a car
+  update: async (id: number, carData: Partial<CreateCarRequest>): Promise<Car> => {
+    return fetchWithAuth<Car>(`/cars/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(carData),
+    });
+  },
+
+  // Delete a car
+  delete: async (id: number): Promise<void> => {
+    return fetchWithAuth<void>(`/cars/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Set a car as primary
+  setPrimary: async (id: number): Promise<Car> => {
+    return fetchWithAuth<Car>(`/cars/${id}/primary`, {
       method: 'POST',
     });
   },

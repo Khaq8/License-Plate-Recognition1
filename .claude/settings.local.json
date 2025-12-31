@@ -9,7 +9,15 @@
       "Bash(docker-compose restart:*)",
       "Bash(docker-compose exec:*)",
       "Bash(docker-compose down:*)",
-      "Bash(docker-compose up:*)"
+      "Bash(docker-compose up:*)",
+      "Bash(chmod:*)",
+      "Bash(python start_camera.py:*)",
+      "Bash(cat:*)",
+      "Bash(npx tsc:*)",
+      "mcp__plugin_exa-mcp-server_exa__web_search_exa",
+      "mcp__plugin_exa-mcp-server_exa__get_code_context_exa",
+      "Bash(wc:*)",
+      "Bash(bun add:*)"
     ],
     "deny": [],
     "ask": []

@@ -5,9 +5,8 @@ import {
   TouchableOpacity,
   Modal,
   FlatList,
-  StyleSheet,
 } from 'react-native';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../constants';
+import { cn } from '../utils/cn';
 import { useLot } from '../contexts/LotContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ParkingLot } from '../types';
@@ -26,9 +25,9 @@ export function LotSelector() {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <View style={[styles.selector, styles.loadingSelector]}>
-          <Text style={styles.loadingText}>Loading lots...</Text>
+      <View className="mb-md">
+        <View className="flex-row items-center justify-center bg-surface rounded-lg p-md border border-border">
+          <Text className="text-text-secondary text-sm">Loading lots...</Text>
         </View>
       </View>
     );
@@ -36,37 +35,37 @@ export function LotSelector() {
 
   if (lots.length === 0) {
     return (
-      <View style={styles.container}>
-        <View style={[styles.selector, styles.emptySelector]}>
-          <Text style={styles.emptyText}>No parking lots available</Text>
+      <View className="mb-md">
+        <View className="flex-row items-center justify-center bg-warning/10 rounded-lg p-md border border-warning">
+          <Text className="text-warning text-sm">No parking lots available</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View className="mb-md">
       <TouchableOpacity
-        style={styles.selector}
+        className="flex-row items-center justify-between bg-surface rounded-lg p-md border border-border"
         onPress={() => setIsOpen(true)}
         activeOpacity={0.7}
       >
-        <View style={styles.lotInfo}>
-          <View style={styles.lotIcon}>
-            <Text style={styles.lotIconText}>P</Text>
+        <View className="flex-row items-center flex-1">
+          <View className="w-10 h-10 rounded-md bg-primary items-center justify-center mr-sm">
+            <Text className="text-surface text-lg font-bold">P</Text>
           </View>
-          <View style={styles.lotDetails}>
-            <Text style={styles.lotName} numberOfLines={1}>
+          <View className="flex-1">
+            <Text className="text-md font-semibold text-text" numberOfLines={1}>
               {selectedLot?.name || 'Select Lot'}
             </Text>
             {selectedLot?.city && (
-              <Text style={styles.lotCity} numberOfLines={1}>
+              <Text className="text-xs text-text-secondary mt-0.5" numberOfLines={1}>
                 {selectedLot.city}
               </Text>
             )}
           </View>
         </View>
-        <Text style={styles.dropdownArrow}>
+        <Text className="text-xs text-text-secondary ml-sm">
           {lots.length > 1 ? '▼' : ''}
         </Text>
       </TouchableOpacity>
@@ -78,65 +77,86 @@ export function LotSelector() {
         onRequestClose={() => setIsOpen(false)}
       >
         <TouchableOpacity
-          style={styles.modalOverlay}
+          className="flex-1 justify-center px-lg"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
           activeOpacity={1}
           onPress={() => setIsOpen(false)}
         >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Parking Lot</Text>
+          <View
+            className="bg-surface rounded-xl overflow-hidden"
+            style={{ maxHeight: '70%' }}
+          >
+            <View className="p-lg border-b border-border">
+              <Text className="text-lg font-semibold text-text text-center">
+                Select Parking Lot
+              </Text>
             </View>
             <FlatList
               data={lots}
               keyExtractor={(item) => item.id.toString()}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={[
-                    styles.lotItem,
-                    selectedLot?.id === item.id && styles.selectedLotItem,
-                  ]}
+                  className={cn(
+                    'flex-row items-center p-md',
+                    selectedLot?.id === item.id && 'bg-primary/10'
+                  )}
                   onPress={() => handleSelectLot(item)}
                 >
-                  <View style={styles.lotItemIcon}>
-                    <Text style={styles.lotItemIconText}>P</Text>
+                  <View className="w-9 h-9 rounded-sm bg-primary items-center justify-center mr-sm">
+                    <Text className="text-surface text-md font-bold">P</Text>
                   </View>
-                  <View style={styles.lotItemInfo}>
+                  <View className="flex-1">
                     <Text
-                      style={[
-                        styles.lotItemName,
-                        selectedLot?.id === item.id && styles.selectedLotText,
-                      ]}
+                      className={cn(
+                        'text-md font-medium',
+                        selectedLot?.id === item.id
+                          ? 'text-primary font-semibold'
+                          : 'text-text'
+                      )}
                     >
                       {item.name}
                     </Text>
-                    <Text style={styles.lotItemDetails}>
+                    <Text className="text-xs text-text-secondary mt-0.5">
                       {item.city ? `${item.city} • ` : ''}
                       {item.capacity} spots • ${item.hourly_rate}/hr
                     </Text>
                   </View>
                   {selectedLot?.id === item.id && (
-                    <Text style={styles.checkmark}>✓</Text>
+                    <Text className="text-lg text-primary font-semibold">✓</Text>
                   )}
                 </TouchableOpacity>
               )}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
+              ItemSeparatorComponent={() => <View className="h-px bg-border" />}
               ListFooterComponent={
                 user?.role === 'admin' ? (
                   <>
-                    <View style={styles.separator} />
+                    <View className="h-px bg-border" />
                     <TouchableOpacity
-                      style={styles.addLotItem}
+                      className="flex-row items-center p-md"
+                      style={{ backgroundColor: 'rgba(37, 99, 235, 0.02)' }}
                       onPress={() => {
                         setIsOpen(false);
                         setShowAddLotModal(true);
                       }}
                     >
-                      <View style={styles.addLotIcon}>
-                        <Text style={styles.addLotIconText}>+</Text>
+                      <View
+                        className="w-9 h-9 rounded-sm items-center justify-center mr-sm"
+                        style={{
+                          backgroundColor: 'transparent',
+                          borderWidth: 2,
+                          borderColor: '#2563EB',
+                          borderStyle: 'dashed',
+                        }}
+                      >
+                        <Text className="text-primary text-xl font-light">+</Text>
                       </View>
-                      <View style={styles.lotItemInfo}>
-                        <Text style={styles.addLotText}>Add New Parking Lot</Text>
-                        <Text style={styles.lotItemDetails}>Create a new facility</Text>
+                      <View className="flex-1">
+                        <Text className="text-md font-semibold text-primary">
+                          Add New Parking Lot
+                        </Text>
+                        <Text className="text-xs text-text-secondary mt-0.5">
+                          Create a new facility
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   </>
@@ -157,171 +177,3 @@ export function LotSelector() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: SPACING.md,
-  },
-  selector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  loadingSelector: {
-    justifyContent: 'center',
-  },
-  emptySelector: {
-    justifyContent: 'center',
-    backgroundColor: `${COLORS.warning}10`,
-    borderColor: COLORS.warning,
-  },
-  loadingText: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZES.sm,
-  },
-  emptyText: {
-    color: COLORS.warning,
-    fontSize: FONT_SIZES.sm,
-  },
-  lotInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  lotIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: BORDER_RADIUS.md,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.sm,
-  },
-  lotIconText: {
-    color: COLORS.surface,
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '700',
-  },
-  lotDetails: {
-    flex: 1,
-  },
-  lotName: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  lotCity: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  dropdownArrow: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
-    marginLeft: SPACING.sm,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.lg,
-  },
-  modalContent: {
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.xl,
-    maxHeight: '70%',
-    overflow: 'hidden',
-  },
-  modalHeader: {
-    padding: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  modalTitle: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '600',
-    color: COLORS.text,
-    textAlign: 'center',
-  },
-  lotItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.md,
-  },
-  selectedLotItem: {
-    backgroundColor: `${COLORS.primary}10`,
-  },
-  lotItemIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: BORDER_RADIUS.sm,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.sm,
-  },
-  lotItemIconText: {
-    color: COLORS.surface,
-    fontSize: FONT_SIZES.md,
-    fontWeight: '700',
-  },
-  lotItemInfo: {
-    flex: 1,
-  },
-  lotItemName: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '500',
-    color: COLORS.text,
-  },
-  selectedLotText: {
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  lotItemDetails: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  checkmark: {
-    fontSize: FONT_SIZES.lg,
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  separator: {
-    height: 1,
-    backgroundColor: COLORS.border,
-  },
-  addLotItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.md,
-    backgroundColor: `${COLORS.primary}05`,
-  },
-  addLotIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: BORDER_RADIUS.sm,
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.sm,
-  },
-  addLotIconText: {
-    color: COLORS.primary,
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '300',
-  },
-  addLotText: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
-    color: COLORS.primary,
-  },
-});
