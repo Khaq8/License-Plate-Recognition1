@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL, STORAGE_KEYS } from '../constants';
-import { PlateDetection, ParkingEntry, ParkingStats, ParkingLot, ParkingLotStatus } from '../types';
+import { PlateDetection, ParkingEntry, ParkingStats, ParkingLot, ParkingLotStatus, ActiveUserInLot, ForceCheckoutResponse } from '../types';
 
 // Helper to get auth header
 async function getAuthHeader(): Promise<Record<string, string>> {
@@ -117,28 +117,42 @@ export function calculateStats(entries: ParkingEntry[], maxCapacity: number): Pa
 
 // Parking service that combines API data with local processing
 export const parkingService = {
-  // Get parking stats
-  getStats: async (maxCapacity: number): Promise<ParkingStats> => {
+  // Get parking stats for a specific lot
+  getStats: async (lotId?: number): Promise<ParkingStats> => {
     try {
+      if (lotId) {
+        // Use the lot status endpoint for accurate data
+        const status = await lotApi.getStatus(lotId);
+        return {
+          currentOccupancy: status.current_occupancy,
+          maxCapacity: status.capacity,
+          availableSpots: status.available_spots,
+        };
+      }
+      // Fallback to plate detection approach
       const detections = await plateApi.getAll();
       const entries = transformToEntries(detections);
-      return calculateStats(entries, maxCapacity);
+      return calculateStats(entries, 100);
     } catch (error) {
       console.error('Error fetching parking stats:', error);
-      // Return empty stats on error
       return {
         currentOccupancy: 0,
-        maxCapacity,
-        availableSpots: maxCapacity,
+        maxCapacity: 100,
+        availableSpots: 100,
       };
     }
   },
 
-  // Get all parking entries
-  getEntries: async (): Promise<ParkingEntry[]> => {
+  // Get all parking entries for a specific lot
+  getEntries: async (lotId?: number): Promise<ParkingEntry[]> => {
     try {
       const detections = await plateApi.getAll();
-      return transformToEntries(detections);
+      let entries = transformToEntries(detections);
+      // Filter by lot if specified
+      if (lotId) {
+        entries = entries.filter(e => e.lotId === lotId);
+      }
+      return entries;
     } catch (error) {
       console.error('Error fetching parking entries:', error);
       return [];
@@ -211,6 +225,29 @@ export const lotApi = {
   deactivate: async (lotId: number): Promise<void> => {
     await fetchWithAuth<void>(`/lots/${lotId}`, {
       method: 'DELETE',
+    });
+  },
+};
+
+// Admin API calls (for user management)
+export const adminApi = {
+  // Get active users/vehicles in a lot
+  getActiveUsersInLot: async (lotId: number, search?: string): Promise<ActiveUserInLot[]> => {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    const queryString = params.toString();
+    return fetchWithAuth<ActiveUserInLot[]>(
+      `/parking/lots/${lotId}/active${queryString ? `?${queryString}` : ''}`
+    );
+  },
+};
+
+// Parking session API calls
+export const parkingApi = {
+  // Force checkout a vehicle
+  forceCheckout: async (sessionId: number): Promise<ForceCheckoutResponse> => {
+    return fetchWithAuth<ForceCheckoutResponse>(`/parking/sessions/${sessionId}/force-checkout`, {
+      method: 'POST',
     });
   },
 };

@@ -67,6 +67,16 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
+  // Clear stored credentials helper
+  const clearStoredCredentials = async () => {
+    try {
+      await SecureStore.deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN);
+      await SecureStore.deleteItemAsync(STORAGE_KEYS.USER_DATA);
+    } catch (e) {
+      console.error('Error clearing credentials:', e);
+    }
+  };
+
   // Restore token on app load
   useEffect(() => {
     async function restoreToken() {
@@ -82,6 +92,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userDataStr = await SecureStore.getItemAsync(STORAGE_KEYS.USER_DATA);
 
         if (token && userDataStr) {
+          // Validate token format (JWT has 3 parts separated by dots)
+          const parts = token.split('.');
+          if (parts.length !== 3) {
+            console.warn('Invalid token format detected, clearing stored credentials');
+            await clearStoredCredentials();
+            dispatch({ type: 'SET_LOADING', payload: false });
+            return;
+          }
+
           const user = JSON.parse(userDataStr) as User;
           dispatch({ type: 'RESTORE_TOKEN', payload: { user, token } });
         } else {
@@ -89,6 +108,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         console.error('Error restoring token:', error);
+        // Clear potentially corrupted credentials
+        await clearStoredCredentials();
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     }
