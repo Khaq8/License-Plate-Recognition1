@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   FlatList,
   RefreshControl,
   ActivityIndicator,
@@ -11,11 +10,11 @@ import {
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { cn } from '../utils/cn';
 import { EntryCard } from '../components';
 import { parkingService } from '../services/api';
 import { useLot } from '../contexts/LotContext';
 import { ParkingEntry, SortField, SortOrder, FilterOptions } from '../types';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../constants';
 
 type StatusFilter = 'all' | 'checked-in' | 'checked-out';
 
@@ -110,32 +109,36 @@ export function LogScreen() {
       animationType="slide"
       onRequestClose={() => setShowFilterModal(false)}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Filters & Sorting</Text>
+      <View className="flex-1 justify-end" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+        <View className="bg-surface rounded-t-xl p-lg pb-xxl">
+          <View className="flex-row justify-between items-center mb-lg">
+            <Text className="text-xl font-bold text-text">Filters & Sorting</Text>
             <TouchableOpacity onPress={() => setShowFilterModal(false)}>
-              <Text style={styles.modalClose}>Done</Text>
+              <Text className="text-md text-primary font-semibold">Done</Text>
             </TouchableOpacity>
           </View>
 
           {/* Status Filter */}
-          <Text style={styles.filterSectionTitle}>Status</Text>
-          <View style={styles.filterOptions}>
+          <Text className="text-sm font-semibold text-text-secondary mb-sm mt-md">Status</Text>
+          <View className="flex-row flex-wrap gap-sm">
             {(['all', 'checked-in', 'checked-out'] as StatusFilter[]).map((status) => (
               <TouchableOpacity
                 key={status}
-                style={[
-                  styles.filterChip,
-                  statusFilter === status && styles.filterChipActive,
-                ]}
+                className={cn(
+                  'px-md py-sm rounded-full border',
+                  statusFilter === status
+                    ? 'bg-primary border-primary'
+                    : 'bg-background border-border'
+                )}
                 onPress={() => setStatusFilter(status)}
               >
                 <Text
-                  style={[
-                    styles.filterChipText,
-                    statusFilter === status && styles.filterChipTextActive,
-                  ]}
+                  className={cn(
+                    'text-sm',
+                    statusFilter === status
+                      ? 'text-surface font-semibold'
+                      : 'text-text-secondary'
+                  )}
                 >
                   {status === 'all' ? 'All' : status === 'checked-in' ? 'Parked' : 'Left'}
                 </Text>
@@ -144,8 +147,8 @@ export function LogScreen() {
           </View>
 
           {/* Sort Field */}
-          <Text style={styles.filterSectionTitle}>Sort By</Text>
-          <View style={styles.filterOptions}>
+          <Text className="text-sm font-semibold text-text-secondary mb-sm mt-md">Sort By</Text>
+          <View className="flex-row flex-wrap gap-sm">
             {[
               { field: 'checkInTime', label: 'Check In' },
               { field: 'checkOutTime', label: 'Check Out' },
@@ -153,17 +156,21 @@ export function LogScreen() {
             ].map(({ field, label }) => (
               <TouchableOpacity
                 key={field}
-                style={[
-                  styles.filterChip,
-                  sortField === field && styles.filterChipActive,
-                ]}
+                className={cn(
+                  'px-md py-sm rounded-full border',
+                  sortField === field
+                    ? 'bg-primary border-primary'
+                    : 'bg-background border-border'
+                )}
                 onPress={() => setSortField(field as SortField)}
               >
                 <Text
-                  style={[
-                    styles.filterChipText,
-                    sortField === field && styles.filterChipTextActive,
-                  ]}
+                  className={cn(
+                    'text-sm',
+                    sortField === field
+                      ? 'text-surface font-semibold'
+                      : 'text-text-secondary'
+                  )}
                 >
                   {label}
                 </Text>
@@ -172,25 +179,29 @@ export function LogScreen() {
           </View>
 
           {/* Sort Order */}
-          <Text style={styles.filterSectionTitle}>Order</Text>
-          <View style={styles.filterOptions}>
+          <Text className="text-sm font-semibold text-text-secondary mb-sm mt-md">Order</Text>
+          <View className="flex-row flex-wrap gap-sm">
             {[
               { order: 'desc', label: 'Newest First' },
               { order: 'asc', label: 'Oldest First' },
             ].map(({ order, label }) => (
               <TouchableOpacity
                 key={order}
-                style={[
-                  styles.filterChip,
-                  sortOrder === order && styles.filterChipActive,
-                ]}
+                className={cn(
+                  'px-md py-sm rounded-full border',
+                  sortOrder === order
+                    ? 'bg-primary border-primary'
+                    : 'bg-background border-border'
+                )}
                 onPress={() => setSortOrder(order as SortOrder)}
               >
                 <Text
-                  style={[
-                    styles.filterChipText,
-                    sortOrder === order && styles.filterChipTextActive,
-                  ]}
+                  className={cn(
+                    'text-sm',
+                    sortOrder === order
+                      ? 'text-surface font-semibold'
+                      : 'text-text-secondary'
+                  )}
                 >
                   {label}
                 </Text>
@@ -200,7 +211,7 @@ export function LogScreen() {
 
           {/* Reset Button */}
           <TouchableOpacity
-            style={styles.resetButton}
+            className="mt-xl py-md items-center rounded-md border border-danger"
             onPress={() => {
               setStatusFilter('all');
               setSortField('checkInTime');
@@ -208,7 +219,7 @@ export function LogScreen() {
               setSearchQuery('');
             }}
           >
-            <Text style={styles.resetButtonText}>Reset Filters</Text>
+            <Text className="text-danger text-md font-semibold">Reset Filters</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -217,68 +228,69 @@ export function LogScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading entries...</Text>
+      <SafeAreaView className="flex-1 bg-background">
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color="#2563EB" />
+          <Text className="mt-md text-text-secondary text-md">Loading entries...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Parking Log</Text>
-        <Text style={styles.subtitle}>
+      <View className="px-lg pt-md pb-sm">
+        <Text className="text-2xl font-bold text-text">Parking Log</Text>
+        <Text className="text-sm text-text-secondary mt-xs">
           {filteredAndSortedEntries.length} entries
         </Text>
       </View>
 
       {/* Search and Filter Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchInputContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+      <View className="flex-row px-lg pb-md gap-sm">
+        <View className="flex-1 flex-row items-center bg-surface rounded-md px-md border border-border">
+          <Text className="text-md mr-sm">🔍</Text>
           <TextInput
-            style={styles.searchInput}
+            className="flex-1 text-md text-text"
+            style={{ height: 44 }}
             placeholder="Search by plate number..."
-            placeholderTextColor={COLORS.textLight}
+            placeholderTextColor="#94A3B8"
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="characters"
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Text style={styles.clearButton}>✕</Text>
+              <Text className="text-md text-text-light p-xs">✕</Text>
             </TouchableOpacity>
           )}
         </View>
         <TouchableOpacity
-          style={styles.filterButton}
+          className="w-11 h-11 bg-surface rounded-md justify-center items-center border border-border"
           onPress={() => setShowFilterModal(true)}
         >
-          <Text style={styles.filterButtonText}>⚙️</Text>
+          <Text className="text-lg">⚙️</Text>
         </TouchableOpacity>
       </View>
 
       {/* Active Filters Display */}
       {(statusFilter !== 'all' || sortField !== 'checkInTime' || sortOrder !== 'desc') && (
-        <View style={styles.activeFilters}>
+        <View className="flex-row px-lg pb-sm gap-sm">
           {statusFilter !== 'all' && (
-            <View style={styles.activeFilterChip}>
-              <Text style={styles.activeFilterText}>
+            <View className="px-sm py-xs rounded-full" style={{ backgroundColor: 'rgba(37, 99, 235, 0.08)' }}>
+              <Text className="text-xs text-primary font-medium">
                 {statusFilter === 'checked-in' ? 'Parked' : 'Left'}
               </Text>
             </View>
           )}
-          <View style={styles.activeFilterChip}>
-            <Text style={styles.activeFilterText}>
+          <View className="px-sm py-xs rounded-full" style={{ backgroundColor: 'rgba(37, 99, 235, 0.08)' }}>
+            <Text className="text-xs text-primary font-medium">
               {sortField === 'plate' ? 'By Plate' : sortField === 'checkOutTime' ? 'By Check Out' : 'By Check In'}
             </Text>
           </View>
-          <View style={styles.activeFilterChip}>
-            <Text style={styles.activeFilterText}>
+          <View className="px-sm py-xs rounded-full" style={{ backgroundColor: 'rgba(37, 99, 235, 0.08)' }}>
+            <Text className="text-xs text-primary font-medium">
               {sortOrder === 'desc' ? '↓ Newest' : '↑ Oldest'}
             </Text>
           </View>
@@ -290,16 +302,16 @@ export function LogScreen() {
         data={filteredAndSortedEntries}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <EntryCard entry={item} />}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={{ padding: 24, paddingTop: 0 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateEmoji}>🚗</Text>
-            <Text style={styles.emptyStateText}>No entries found</Text>
-            <Text style={styles.emptyStateSubtext}>
+          <View className="items-center py-xxl">
+            <Text style={{ fontSize: 48 }} className="mb-md">🚗</Text>
+            <Text className="text-lg font-semibold text-text-secondary">No entries found</Text>
+            <Text className="text-sm text-text-light mt-xs">
               {searchQuery
                 ? 'Try a different search term'
                 : 'Parking entries will appear here'}
@@ -312,192 +324,3 @@ export function LogScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: SPACING.md,
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZES.md,
-  },
-  header: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.md,
-    paddingBottom: SPACING.sm,
-  },
-  title: {
-    fontSize: FONT_SIZES.xxl,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  subtitle: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    marginTop: SPACING.xs,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.md,
-    gap: SPACING.sm,
-  },
-  searchInputContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  searchIcon: {
-    fontSize: FONT_SIZES.md,
-    marginRight: SPACING.sm,
-  },
-  searchInput: {
-    flex: 1,
-    height: 44,
-    fontSize: FONT_SIZES.md,
-    color: COLORS.text,
-  },
-  clearButton: {
-    fontSize: FONT_SIZES.md,
-    color: COLORS.textLight,
-    padding: SPACING.xs,
-  },
-  filterButton: {
-    width: 44,
-    height: 44,
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  filterButtonText: {
-    fontSize: FONT_SIZES.lg,
-  },
-  activeFilters: {
-    flexDirection: 'row',
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.sm,
-    gap: SPACING.sm,
-  },
-  activeFilterChip: {
-    backgroundColor: `${COLORS.primary}15`,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  activeFilterText: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.primary,
-    fontWeight: '500',
-  },
-  listContent: {
-    padding: SPACING.lg,
-    paddingTop: 0,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: SPACING.xxl,
-  },
-  emptyStateEmoji: {
-    fontSize: 48,
-    marginBottom: SPACING.md,
-  },
-  emptyStateText: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-  },
-  emptyStateSubtext: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textLight,
-    marginTop: SPACING.xs,
-  },
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: COLORS.surface,
-    borderTopLeftRadius: BORDER_RADIUS.xl,
-    borderTopRightRadius: BORDER_RADIUS.xl,
-    padding: SPACING.lg,
-    paddingBottom: SPACING.xxl,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.lg,
-  },
-  modalTitle: {
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  modalClose: {
-    fontSize: FONT_SIZES.md,
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  filterSectionTitle: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.sm,
-    marginTop: SPACING.md,
-  },
-  filterOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
-  },
-  filterChip: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.background,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  filterChipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  filterChipText: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-  },
-  filterChipTextActive: {
-    color: COLORS.surface,
-    fontWeight: '600',
-  },
-  resetButton: {
-    marginTop: SPACING.xl,
-    paddingVertical: SPACING.md,
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.danger,
-  },
-  resetButtonText: {
-    color: COLORS.danger,
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
-  },
-});

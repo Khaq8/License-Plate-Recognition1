@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
     View,
     Text,
-    StyleSheet,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -11,8 +10,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Input, Button } from '../components';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, API_BASE_URL } from '../constants';
+import { API_BASE_URL } from '../constants';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { hashPassword } from '../utils/password';
 
 type Props = {
     navigation: NativeStackNavigationProp<any>;
@@ -77,21 +77,18 @@ export function SignupScreen({ navigation }: Props) {
 
         setIsLoading(true);
 
-        const payload = {
-            username: username.trim(),
-            email: email.trim(),
-            first_name: firstName.trim(),
-            last_name: lastName.trim(),
-            password: password,
-        };
-
-        console.log('=== SIGNUP DEBUG ===');
-        console.log('API_BASE_URL:', API_BASE_URL);
-        console.log('Full URL:', `${API_BASE_URL}/auth/register`);
-        console.log('Payload:', JSON.stringify(payload, null, 2));
-
         try {
-            console.log('Sending fetch request...');
+            // Hash password before sending to backend (CWE-312, CWE-359 mitigation)
+            const hashedPassword = await hashPassword(password);
+
+            const payload = {
+                username: username.trim(),
+                email: email.trim(),
+                first_name: firstName.trim(),
+                last_name: lastName.trim(),
+                password: hashedPassword,
+            };
+
             const response = await fetch(`${API_BASE_URL}/auth/register`, {
                 method: 'POST',
                 headers: {
@@ -100,12 +97,7 @@ export function SignupScreen({ navigation }: Props) {
                 body: JSON.stringify(payload),
             });
 
-            console.log('Response status:', response.status);
-            console.log('Response ok:', response.ok);
-            console.log('Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
-
             const responseText = await response.text();
-            console.log('Response body (raw):', responseText);
 
             if (!response.ok) {
                 let errorDetail = 'Registration failed';
@@ -113,13 +105,10 @@ export function SignupScreen({ navigation }: Props) {
                     const errorData = JSON.parse(responseText);
                     errorDetail = errorData.detail || errorDetail;
                 } catch (e) {
-                    console.log('Could not parse error response as JSON');
+                    // CWE-532 mitigation: no sensitive data logging
                 }
                 throw new Error(errorDetail);
             }
-
-            const successData = JSON.parse(responseText);
-            console.log('Success response:', JSON.stringify(successData, null, 2));
 
             Alert.alert(
                 'Success!',
@@ -132,10 +121,8 @@ export function SignupScreen({ navigation }: Props) {
                 ]
             );
         } catch (error) {
-            console.log('=== SIGNUP ERROR ===');
-            console.log('Error type:', error?.constructor?.name);
-            console.log('Error message:', error instanceof Error ? error.message : String(error));
-            console.log('Full error:', error);
+            // CWE-532 mitigation: sanitized error logging without sensitive data
+            console.error('Registration failed');
 
             Alert.alert(
                 'Registration Failed',
@@ -143,29 +130,46 @@ export function SignupScreen({ navigation }: Props) {
             );
         } finally {
             setIsLoading(false);
-            console.log('=== SIGNUP COMPLETE ===');
         }
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView className="flex-1 bg-background">
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.keyboardView}
+                className="flex-1"
             >
                 <ScrollView
-                    contentContainerStyle={styles.scrollContent}
+                    contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, justifyContent: 'center', paddingVertical: 32 }}
                     keyboardShouldPersistTaps="handled"
                 >
-                    <View style={styles.header}>
-                        <View style={styles.logoContainer}>
-                            <Text style={styles.logoText}>P</Text>
+                    <View className="items-center mb-xl">
+                        <View
+                            className="w-20 h-20 bg-primary rounded-xl justify-center items-center mb-md"
+                            style={{
+                                shadowColor: '#2563EB',
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 8,
+                                elevation: 8,
+                            }}
+                        >
+                            <Text className="text-3xl font-bold text-surface">P</Text>
                         </View>
-                        <Text style={styles.title}>Create Account</Text>
-                        <Text style={styles.subtitle}>Join our parking management system</Text>
+                        <Text className="text-2xl font-bold text-text mb-xs">Create Account</Text>
+                        <Text className="text-sm text-text-secondary">Join our parking management system</Text>
                     </View>
 
-                    <View style={styles.form}>
+                    <View
+                        className="bg-surface p-lg rounded-lg"
+                        style={{
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.1,
+                            shadowRadius: 8,
+                            elevation: 3,
+                        }}
+                    >
                         <Input
                             label="Username *"
                             placeholder="Choose a username"
@@ -197,8 +201,8 @@ export function SignupScreen({ navigation }: Props) {
                             error={errors.email}
                         />
 
-                        <View style={styles.nameRow}>
-                            <View style={styles.nameField}>
+                        <View className="flex-row gap-sm">
+                            <View className="flex-1">
                                 <Input
                                     label="First Name *"
                                     placeholder="John"
@@ -213,7 +217,7 @@ export function SignupScreen({ navigation }: Props) {
                                     error={errors.firstName}
                                 />
                             </View>
-                            <View style={styles.nameField}>
+                            <View className="flex-1">
                                 <Input
                                     label="Last Name *"
                                     placeholder="Doe"
@@ -263,15 +267,15 @@ export function SignupScreen({ navigation }: Props) {
                             onPress={handleSignup}
                             loading={isLoading}
                             size="large"
-                            style={styles.signupButton}
+                            className="mt-md"
                         />
 
                         <TouchableOpacity
-                            style={styles.loginLink}
+                            className="mt-md items-center"
                             onPress={() => navigation.navigate('Login')}
                         >
-                            <Text style={styles.loginLinkText}>
-                                Already have an account? <Text style={styles.loginLinkBold}>Sign In</Text>
+                            <Text className="text-sm text-text-secondary">
+                                Already have an account? <Text className="text-primary font-semibold">Sign In</Text>
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -280,84 +284,3 @@ export function SignupScreen({ navigation }: Props) {
         </SafeAreaView>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-    },
-    keyboardView: {
-        flex: 1,
-    },
-    scrollContent: {
-        flexGrow: 1,
-        paddingHorizontal: SPACING.lg,
-        justifyContent: 'center',
-        paddingVertical: SPACING.xl,
-    },
-    header: {
-        alignItems: 'center',
-        marginBottom: SPACING.xl,
-    },
-    logoContainer: {
-        width: 80,
-        height: 80,
-        backgroundColor: COLORS.primary,
-        borderRadius: BORDER_RADIUS.xl,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: SPACING.md,
-        shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 8,
-    },
-    logoText: {
-        fontSize: FONT_SIZES.xxxl,
-        fontWeight: '700',
-        color: COLORS.surface,
-    },
-    title: {
-        fontSize: FONT_SIZES.xxl,
-        fontWeight: '700',
-        color: COLORS.text,
-        marginBottom: SPACING.xs,
-    },
-    subtitle: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-    },
-    form: {
-        backgroundColor: COLORS.surface,
-        padding: SPACING.lg,
-        borderRadius: BORDER_RADIUS.lg,
-        shadowColor: COLORS.shadow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 3,
-    },
-    nameRow: {
-        flexDirection: 'row',
-        gap: SPACING.sm,
-    },
-    nameField: {
-        flex: 1,
-    },
-    signupButton: {
-        marginTop: SPACING.md,
-    },
-    loginLink: {
-        marginTop: SPACING.md,
-        alignItems: 'center',
-    },
-    loginLinkText: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-    },
-    loginLinkBold: {
-        color: COLORS.primary,
-        fontWeight: '600',
-    },
-});

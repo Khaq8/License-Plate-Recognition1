@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -12,8 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { Input, Button } from '../components';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../constants';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { hashPassword } from '../utils/password';
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -47,34 +46,60 @@ export function LoginScreen({ navigation }: Props) {
   const handleLogin = async () => {
     if (!validateForm()) return;
 
-    const result = await login(email, password);
+    try {
+      // Hash password before sending to backend (CWE-312, CWE-359 mitigation)
+      const hashedPassword = await hashPassword(password);
+      const result = await login(email, hashedPassword);
 
-    if (!result.success) {
-      Alert.alert('Login Failed', result.error || 'Please check your credentials');
+      if (!result.success) {
+        Alert.alert('Login Failed', result.error || 'Please check your credentials');
+      }
+    } catch (error) {
+      // CWE-532 mitigation: sanitized error logging
+      console.error('Login process failed');
+      Alert.alert('Login Failed', 'An error occurred during login');
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView className="flex-1 bg-background">
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
+        className="flex-1"
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, justifyContent: 'center' }}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>P</Text>
+          <View className="items-center mb-xxl">
+            <View
+              className="w-20 h-20 bg-primary rounded-xl justify-center items-center mb-md"
+              style={{
+                shadowColor: '#2563EB',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 8,
+              }}
+            >
+              <Text className="text-3xl font-bold text-surface">P</Text>
             </View>
-            <Text style={styles.title}>ParkingLot Pro</Text>
-            <Text style={styles.subtitle}>License Plate Recognition System</Text>
+            <Text className="text-2xl font-bold text-text mb-xs">ParkingLot Pro</Text>
+            <Text className="text-sm text-text-secondary">License Plate Recognition System</Text>
           </View>
 
-          <View style={styles.form}>
-            <Text style={styles.welcomeText}>Welcome back</Text>
-            <Text style={styles.instructionText}>
+          <View
+            className="bg-surface p-lg rounded-lg"
+            style={{
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 8,
+              elevation: 3,
+            }}
+          >
+            <Text className="text-xl font-bold text-text mb-xs">Welcome back</Text>
+            <Text className="text-sm text-text-secondary mb-lg">
               Sign in to access your parking management dashboard
             </Text>
 
@@ -103,21 +128,21 @@ export function LoginScreen({ navigation }: Props) {
               onPress={handleLogin}
               loading={isLoading}
               size="large"
-              style={styles.loginButton}
+              className="mt-md"
             />
 
             <TouchableOpacity
-              style={styles.signupLink}
+              className="mt-md items-center"
               onPress={() => navigation.navigate('Signup')}
             >
-              <Text style={styles.signupLinkText}>
-                Don't have an account? <Text style={styles.signupLinkBold}>Create one</Text>
+              <Text className="text-sm text-text-secondary">
+                Don't have an account? <Text className="text-primary font-semibold">Create one</Text>
               </Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>
+          <View className="items-center mt-xxl">
+            <Text className="text-xs text-text-light">
               FastALPR Parking Management
             </Text>
           </View>
@@ -126,95 +151,3 @@ export function LoginScreen({ navigation }: Props) {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: SPACING.lg,
-    justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: SPACING.xxl,
-  },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    backgroundColor: COLORS.primary,
-    borderRadius: BORDER_RADIUS.xl,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  logoText: {
-    fontSize: FONT_SIZES.xxxl,
-    fontWeight: '700',
-    color: COLORS.surface,
-  },
-  title: {
-    fontSize: FONT_SIZES.xxl,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: SPACING.xs,
-  },
-  subtitle: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-  },
-  form: {
-    backgroundColor: COLORS.surface,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.lg,
-    shadowColor: COLORS.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  welcomeText: {
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: SPACING.xs,
-  },
-  instructionText: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.lg,
-  },
-  loginButton: {
-    marginTop: SPACING.md,
-  },
-  footer: {
-    alignItems: 'center',
-    marginTop: SPACING.xxl,
-  },
-  footerText: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textLight,
-  },
-  signupLink: {
-    marginTop: SPACING.md,
-    alignItems: 'center',
-  },
-  signupLinkText: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-  },
-  signupLinkBold: {
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-});

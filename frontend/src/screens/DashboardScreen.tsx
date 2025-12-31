@@ -2,19 +2,19 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { cn } from '../utils/cn';
 import { useAuth } from '../contexts/AuthContext';
 import { useLot } from '../contexts/LotContext';
 import { StatWidget, AddCarModal, LotSelector } from '../components';
 import { parkingService } from '../services/api';
 import { ParkingStats, ParkingEntry, CreateCarRequest } from '../types';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, API_BASE_URL } from '../constants';
+import { API_BASE_URL } from '../constants';
 
 export function DashboardScreen() {
   const { user, token } = useAuth();
@@ -84,16 +84,16 @@ export function DashboardScreen() {
   };
 
   const getOccupancyColor = (): string => {
-    if (!stats) return COLORS.primary;
+    if (!stats) return '#2563EB';
     const percentage = stats.currentOccupancy / stats.maxCapacity;
-    if (percentage >= 0.9) return COLORS.danger;
-    if (percentage >= 0.7) return COLORS.warning;
-    return COLORS.success;
+    if (percentage >= 0.9) return '#EF4444';
+    if (percentage >= 0.7) return '#F59E0B';
+    return '#10B981';
   };
 
   // Get color based on availability (5 degrees from green to red)
   const getAvailabilityColor = (): { background: string; text: string } => {
-    if (!stats) return { background: COLORS.primary, text: '#FFFFFF' };
+    if (!stats) return { background: '#2563EB', text: '#FFFFFF' };
 
     const availabilityPercentage = stats.availableSpots / stats.maxCapacity;
 
@@ -125,33 +125,33 @@ export function DashboardScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading dashboard...</Text>
+      <SafeAreaView className="flex-1 bg-background">
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color="#2563EB" />
+          <Text className="mt-md text-text-secondary text-md">Loading dashboard...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        className="flex-1"
+        contentContainerStyle={{ padding: 24 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <View style={styles.header}>
+        <View className="flex-row justify-between items-start mb-lg">
           <View>
-            <Text style={styles.greeting}>{getGreeting()},</Text>
-            <Text style={styles.userName}>{user?.name || 'User'}</Text>
+            <Text className="text-md text-text-secondary">{getGreeting()},</Text>
+            <Text className="text-2xl font-bold text-text">{user?.name || 'User'}</Text>
           </View>
-          <View style={styles.dateContainer}>
-            <Text style={styles.dateText}>
+          <View className="bg-surface px-md py-sm rounded-md">
+            <Text className="text-sm text-text-secondary font-medium">
               {new Date().toLocaleDateString('en-US', {
                 weekday: 'short',
                 month: 'short',
@@ -165,7 +165,7 @@ export function DashboardScreen() {
         <LotSelector />
 
         {/* Stats Widgets */}
-        <Text style={styles.sectionTitle}>Parking Overview</Text>
+        <Text className="text-lg font-semibold text-text mb-md mt-md">Parking Overview</Text>
         <StatWidget
           title="Available Spots"
           value={stats?.availableSpots ?? 0}
@@ -176,62 +176,89 @@ export function DashboardScreen() {
 
         {/* Add Car Widget */}
         <TouchableOpacity
-          style={styles.addCarWidget}
+          className="flex-row items-center bg-surface p-lg rounded-lg mt-lg border-2 border-primary"
+          style={{
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 3,
+            borderStyle: 'dashed',
+          }}
           onPress={() => setShowAddCarModal(true)}
           activeOpacity={0.7}
         >
-          <View style={styles.addCarIconContainer}>
-            <Text style={styles.addCarIcon}>🚗</Text>
+          <View
+            className="w-12 h-12 rounded-md justify-center items-center mr-md"
+            style={{ backgroundColor: 'rgba(37, 99, 235, 0.08)' }}
+          >
+            <Text style={{ fontSize: 24 }}>🚗</Text>
           </View>
-          <View style={styles.addCarContent}>
-            <Text style={styles.addCarTitle}>Add Your Car</Text>
-            <Text style={styles.addCarSubtitle}>Register your vehicle for faster parking</Text>
+          <View className="flex-1">
+            <Text className="text-md font-semibold text-text mb-0.5">Add Your Car</Text>
+            <Text className="text-xs text-text-secondary">Register your vehicle for faster parking</Text>
           </View>
-          <Text style={styles.addCarArrow}>→</Text>
+          <Text className="text-xl text-primary font-semibold">→</Text>
         </TouchableOpacity>
 
         {/* Occupancy Bar */}
-        <View style={styles.occupancyCard}>
-          <View style={styles.occupancyHeader}>
-            <Text style={styles.occupancyTitle}>Lot Capacity</Text>
-            <Text style={styles.occupancyPercent}>
+        <View
+          className="bg-surface p-lg rounded-lg mt-lg"
+          style={{
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 3,
+          }}
+        >
+          <View className="flex-row justify-between items-center mb-md">
+            <Text className="text-md font-semibold text-text">Lot Capacity</Text>
+            <Text className="text-lg font-bold text-primary">
               {stats ? Math.round((stats.currentOccupancy / stats.maxCapacity) * 100) : 0}%
             </Text>
           </View>
-          <View style={styles.progressBarContainer}>
+          <View className="h-2 bg-border rounded overflow-hidden">
             <View
-              style={[
-                styles.progressBar,
-                {
-                  width: `${stats ? (stats.currentOccupancy / stats.maxCapacity) * 100 : 0}%`,
-                  backgroundColor: getOccupancyColor(),
-                },
-              ]}
+              className="h-full rounded"
+              style={{
+                width: `${stats ? (stats.currentOccupancy / stats.maxCapacity) * 100 : 0}%`,
+                backgroundColor: getOccupancyColor(),
+              }}
             />
           </View>
-          <View style={styles.occupancyLegend}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: COLORS.success }]} />
-              <Text style={styles.legendText}>Low (0-70%)</Text>
+          <View className="flex-row justify-between mt-md">
+            <View className="flex-row items-center">
+              <View className="w-2 h-2 rounded-full bg-success mr-xs" />
+              <Text className="text-xs text-text-secondary">Low (0-70%)</Text>
             </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: COLORS.warning }]} />
-              <Text style={styles.legendText}>Medium (70-90%)</Text>
+            <View className="flex-row items-center">
+              <View className="w-2 h-2 rounded-full bg-warning mr-xs" />
+              <Text className="text-xs text-text-secondary">Medium (70-90%)</Text>
             </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: COLORS.danger }]} />
-              <Text style={styles.legendText}>Full (90%+)</Text>
+            <View className="flex-row items-center">
+              <View className="w-2 h-2 rounded-full bg-danger mr-xs" />
+              <Text className="text-xs text-text-secondary">Full (90%+)</Text>
             </View>
           </View>
         </View>
 
         {/* Recent Activity */}
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
-        <View style={styles.recentActivity}>
+        <Text className="text-lg font-semibold text-text mb-md mt-md">Recent Activity</Text>
+        <View
+          className="bg-surface rounded-lg overflow-hidden"
+          style={{
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 3,
+          }}
+        >
           {recentEntries.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No recent activity</Text>
-              <Text style={styles.emptyStateSubtext}>
+            <View className="p-xl items-center">
+              <Text className="text-md font-semibold text-text-secondary">No recent activity</Text>
+              <Text className="text-sm text-text-light mt-xs">
                 Vehicle entries will appear here
               </Text>
             </View>
@@ -239,19 +266,21 @@ export function DashboardScreen() {
             recentEntries.map((entry, index) => (
               <View
                 key={entry.id}
-                style={[
-                  styles.activityItem,
-                  index === recentEntries.length - 1 && styles.lastActivityItem,
-                ]}
+                className={cn(
+                  'flex-row items-center p-md border-b border-border',
+                  index === recentEntries.length - 1 && 'border-b-0'
+                )}
               >
-                <View style={styles.activityIcon}>
-                  <Text style={styles.activityIconText}>
+                <View className="w-9 h-9 rounded-full bg-background justify-center items-center mr-md">
+                  <Text className="text-lg font-semibold text-primary">
                     {entry.checkOutTime ? '↑' : '↓'}
                   </Text>
                 </View>
-                <View style={styles.activityContent}>
-                  <Text style={styles.activityPlate}>{entry.plate}</Text>
-                  <Text style={styles.activityTime}>
+                <View className="flex-1">
+                  <Text className="text-md font-semibold text-text" style={{ letterSpacing: 1 }}>
+                    {entry.plate}
+                  </Text>
+                  <Text className="text-xs text-text-secondary mt-0.5">
                     {new Date(entry.checkInTime).toLocaleTimeString('en-US', {
                       hour: '2-digit',
                       minute: '2-digit',
@@ -261,12 +290,12 @@ export function DashboardScreen() {
                   </Text>
                 </View>
                 <View
-                  style={[
-                    styles.activityStatus,
-                    { backgroundColor: entry.checkOutTime ? COLORS.secondary : COLORS.success },
-                  ]}
+                  className="px-sm py-xs rounded-full"
+                  style={{
+                    backgroundColor: entry.checkOutTime ? '#64748B' : '#10B981',
+                  }}
                 >
-                  <Text style={styles.activityStatusText}>
+                  <Text className="text-xs font-semibold text-surface">
                     {entry.checkOutTime ? 'Left' : 'In'}
                   </Text>
                 </View>
@@ -285,239 +314,3 @@ export function DashboardScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: SPACING.md,
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZES.md,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: SPACING.lg,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: SPACING.lg,
-  },
-  greeting: {
-    fontSize: FONT_SIZES.md,
-    color: COLORS.textSecondary,
-  },
-  userName: {
-    fontSize: FONT_SIZES.xxl,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  dateContainer: {
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
-  },
-  dateText: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    fontWeight: '500',
-  },
-  sectionTitle: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginBottom: SPACING.md,
-    marginTop: SPACING.md,
-  },
-  widgetsRow: {
-    flexDirection: 'row',
-  },
-  widgetSpacer: {
-    width: SPACING.md,
-  },
-  occupancyCard: {
-    backgroundColor: COLORS.surface,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.lg,
-    marginTop: SPACING.lg,
-    shadowColor: COLORS.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  occupancyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  occupancyTitle: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  occupancyPercent: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: COLORS.border,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  occupancyLegend: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: SPACING.md,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: SPACING.xs,
-  },
-  legendText: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
-  },
-  recentActivity: {
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.lg,
-    shadowColor: COLORS.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    overflow: 'hidden',
-  },
-  emptyState: {
-    padding: SPACING.xl,
-    alignItems: 'center',
-  },
-  emptyStateText: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-  },
-  emptyStateSubtext: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textLight,
-    marginTop: SPACING.xs,
-  },
-  activityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  lastActivityItem: {
-    borderBottomWidth: 0,
-  },
-  activityIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING.md,
-  },
-  activityIconText: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '600',
-    color: COLORS.primary,
-  },
-  activityContent: {
-    flex: 1,
-  },
-  activityPlate: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
-    color: COLORS.text,
-    letterSpacing: 1,
-  },
-  activityTime: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  activityStatus: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  activityStatusText: {
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '600',
-    color: COLORS.surface,
-  },
-  addCarWidget: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.lg,
-    marginTop: SPACING.lg,
-    shadowColor: COLORS.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    borderStyle: 'dashed',
-  },
-  addCarIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: BORDER_RADIUS.md,
-    backgroundColor: `${COLORS.primary}15`,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING.md,
-  },
-  addCarIcon: {
-    fontSize: 24,
-  },
-  addCarContent: {
-    flex: 1,
-  },
-  addCarTitle: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginBottom: 2,
-  },
-  addCarSubtitle: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
-  },
-  addCarArrow: {
-    fontSize: FONT_SIZES.xl,
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-});

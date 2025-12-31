@@ -2,12 +2,11 @@ import React from 'react';
 import {
   TouchableOpacity,
   Text,
-  StyleSheet,
   ActivityIndicator,
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../constants';
+import { cn } from '../utils/cn';
 
 interface ButtonProps {
   title: string;
@@ -18,6 +17,8 @@ interface ButtonProps {
   loading?: boolean;
   style?: ViewStyle;
   textStyle?: TextStyle;
+  className?: string;
+  textClassName?: string;
 }
 
 export function Button({
@@ -29,106 +30,72 @@ export function Button({
   loading = false,
   style,
   textStyle,
+  className,
+  textClassName,
 }: ButtonProps) {
-  const buttonStyles = [
-    styles.base,
-    styles[variant],
-    styles[`${size}Size`],
-    disabled && styles.disabled,
-    style,
-  ];
+  // Button variant classes
+  const variantClasses = {
+    primary: 'bg-primary',
+    secondary: 'bg-secondary',
+    outline: 'bg-transparent border-2 border-primary',
+    danger: 'bg-danger',
+  };
 
-  const textStyles = [
-    styles.text,
-    styles[`${variant}Text`],
-    styles[`${size}Text`],
-    disabled && styles.disabledText,
-    textStyle,
-  ];
+  // Button size classes
+  const sizeClasses = {
+    small: 'px-md py-sm',
+    medium: 'px-lg py-md',
+    large: 'px-xl py-lg',
+  };
+
+  // Text variant classes
+  const textVariantClasses = {
+    primary: 'text-surface',
+    secondary: 'text-surface',
+    outline: 'text-primary',
+    danger: 'text-surface',
+  };
+
+  // Text size classes
+  const textSizeClasses = {
+    small: 'text-sm',
+    medium: 'text-md',
+    large: 'text-lg',
+  };
 
   return (
     <TouchableOpacity
-      style={buttonStyles}
+      className={cn(
+        'items-center justify-center rounded-md',
+        variantClasses[variant],
+        sizeClasses[size],
+        disabled && 'opacity-50',
+        className
+      )}
+      style={style}
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.8}
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'outline' ? COLORS.primary : COLORS.surface}
+          color={variant === 'outline' ? '#2563EB' : '#FFFFFF'}
           size="small"
         />
       ) : (
-        <Text style={textStyles}>{title}</Text>
+        <Text
+          className={cn(
+            'font-semibold',
+            textVariantClasses[variant],
+            textSizeClasses[size],
+            disabled && 'opacity-70',
+            textClassName
+          )}
+          style={textStyle}
+        >
+          {title}
+        </Text>
       )}
     </TouchableOpacity>
   );
 }
-
-const styles = StyleSheet.create({
-  base: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: BORDER_RADIUS.md,
-  },
-  // Variants
-  primary: {
-    backgroundColor: COLORS.primary,
-  },
-  secondary: {
-    backgroundColor: COLORS.secondary,
-  },
-  outline: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-  },
-  danger: {
-    backgroundColor: COLORS.danger,
-  },
-  // Sizes
-  smallSize: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  mediumSize: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-  },
-  largeSize: {
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.lg,
-  },
-  // Disabled
-  disabled: {
-    opacity: 0.5,
-  },
-  // Text styles
-  text: {
-    fontWeight: '600',
-  },
-  primaryText: {
-    color: COLORS.surface,
-  },
-  secondaryText: {
-    color: COLORS.surface,
-  },
-  outlineText: {
-    color: COLORS.primary,
-  },
-  dangerText: {
-    color: COLORS.surface,
-  },
-  smallText: {
-    fontSize: FONT_SIZES.sm,
-  },
-  mediumText: {
-    fontSize: FONT_SIZES.md,
-  },
-  largeText: {
-    fontSize: FONT_SIZES.lg,
-  },
-  disabledText: {
-    opacity: 0.7,
-  },
-});

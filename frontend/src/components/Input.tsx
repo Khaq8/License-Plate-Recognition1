@@ -3,17 +3,17 @@ import {
   View,
   TextInput,
   Text,
-  StyleSheet,
   TouchableOpacity,
   TextInputProps,
   ViewStyle,
 } from 'react-native';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../constants';
+import { cn } from '../utils/cn';
 
 interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
   containerStyle?: ViewStyle;
+  containerClassName?: string;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   isPassword?: boolean;
@@ -23,6 +23,7 @@ export function Input({
   label,
   error,
   containerStyle,
+  containerClassName,
   leftIcon,
   rightIcon,
   isPassword = false,
@@ -32,23 +33,34 @@ export function Input({
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <View style={[styles.container, containerStyle]}>
-      {label && <Text style={styles.label}>{label}</Text>}
+    <View
+      className={cn('mb-md', containerClassName)}
+      style={containerStyle}
+    >
+      {label && (
+        <Text className="text-sm font-semibold text-text mb-sm">
+          {label}
+        </Text>
+      )}
       <View
-        style={[
-          styles.inputContainer,
-          isFocused && styles.inputFocused,
-          error && styles.inputError,
-        ]}
+        className={cn(
+          'flex-row items-center bg-surface rounded-md px-md',
+          'border',
+          isFocused ? 'border-primary border-2' : 'border-border',
+          error && 'border-danger'
+        )}
       >
-        {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
+        {leftIcon && (
+          <View className="mr-xs">{leftIcon}</View>
+        )}
         <TextInput
-          style={[
-            styles.input,
-            leftIcon ? styles.inputWithLeftIcon : undefined,
-            (rightIcon || isPassword) ? styles.inputWithRightIcon : undefined,
-          ]}
-          placeholderTextColor={COLORS.textLight}
+          className={cn(
+            'flex-1 text-md text-text',
+            leftIcon && 'ml-sm',
+            (rightIcon || isPassword) && 'mr-sm'
+          )}
+          style={{ height: 48 }}
+          placeholderTextColor="#94A3B8"
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           secureTextEntry={isPassword && !showPassword}
@@ -56,71 +68,23 @@ export function Input({
         />
         {isPassword && (
           <TouchableOpacity
-            style={styles.iconRight}
+            className="ml-xs"
             onPress={() => setShowPassword(!showPassword)}
           >
-            <Text style={styles.showHideText}>{showPassword ? 'Hide' : 'Show'}</Text>
+            <Text className="text-primary text-sm font-semibold">
+              {showPassword ? 'Hide' : 'Show'}
+            </Text>
           </TouchableOpacity>
         )}
-        {rightIcon && !isPassword && <View style={styles.iconRight}>{rightIcon}</View>}
+        {rightIcon && !isPassword && (
+          <View className="ml-xs">{rightIcon}</View>
+        )}
       </View>
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {error && (
+        <Text className="text-danger text-xs mt-xs">
+          {error}
+        </Text>
+      )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: SPACING.md,
-  },
-  label: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginBottom: SPACING.sm,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING.md,
-  },
-  inputFocused: {
-    borderColor: COLORS.primary,
-    borderWidth: 2,
-  },
-  inputError: {
-    borderColor: COLORS.danger,
-  },
-  input: {
-    flex: 1,
-    height: 48,
-    fontSize: FONT_SIZES.md,
-    color: COLORS.text,
-  },
-  inputWithLeftIcon: {
-    marginLeft: SPACING.sm,
-  },
-  inputWithRightIcon: {
-    marginRight: SPACING.sm,
-  },
-  iconLeft: {
-    marginRight: SPACING.xs,
-  },
-  iconRight: {
-    marginLeft: SPACING.xs,
-  },
-  showHideText: {
-    color: COLORS.primary,
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-  },
-  errorText: {
-    color: COLORS.danger,
-    fontSize: FONT_SIZES.xs,
-    marginTop: SPACING.xs,
-  },
-});

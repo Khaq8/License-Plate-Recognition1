@@ -1,0 +1,25 @@
+{
+  "lots": {
+    "main-a": {
+      "lot_id": 1,
+      "name": "Main Entrance A",
+      "description": "Salmiya Block 4 - Main parking facility"
+    },
+    "underground-p2": {
+      "lot_id": 2,
+      "name": "Underground P2",
+      "description": "Kuwait City Floor -2 - Underground parking"
+    },
+    "vip-surface": {
+      "lot_id": 3,
+      "name": "VIP Surface Lot",
+      "description": "Ahmadi East Wing - Premium parking area"
+    }
+  },
+  "defaults": {
+    "api_url": "http://127.0.0.1:8000",
+    "confidence": 0.7,
+    "duplicate_threshold": 5.0,
+    "camera_index": 0
+  }
+}

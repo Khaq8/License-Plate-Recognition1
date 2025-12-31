@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   FlatList,
   TextInput,
   TouchableOpacity,
@@ -12,10 +11,10 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { cn } from '../utils/cn';
 import { useLot } from '../contexts/LotContext';
 import { adminApi, parkingApi } from '../services/api';
 import { ActiveUserInLot } from '../types';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../constants';
 
 interface UserActionModalProps {
   visible: boolean;
@@ -62,57 +61,68 @@ function UserActionModal({ visible, user, onClose, onForceCheckout }: UserAction
   };
 
   return (
-    <View style={modalStyles.overlay}>
-      <View style={modalStyles.container}>
-        <View style={modalStyles.header}>
-          <Text style={modalStyles.title}>Vehicle Details</Text>
+    <View
+      className="absolute top-0 left-0 right-0 bottom-0 justify-center p-lg"
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+    >
+      <View className="bg-surface rounded-xl overflow-hidden">
+        <View className="flex-row justify-between items-center p-lg border-b border-border">
+          <Text className="text-lg font-semibold text-text">Vehicle Details</Text>
           <TouchableOpacity onPress={onClose}>
-            <Text style={modalStyles.closeButton}>X</Text>
+            <Text className="text-xl text-text-secondary font-light">X</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={modalStyles.content}>
-          <View style={modalStyles.plateContainer}>
-            <Text style={modalStyles.plateText}>{user.plate}</Text>
+        <View className="p-lg">
+          <View className="bg-text px-lg py-md rounded-md self-center mb-lg">
+            <Text className="text-surface text-xl font-bold" style={{ letterSpacing: 2 }}>
+              {user.plate}
+            </Text>
           </View>
 
-          <View style={modalStyles.detailRow}>
-            <Text style={modalStyles.label}>User</Text>
-            <Text style={modalStyles.value}>{user.username || 'Unknown'}</Text>
+          <View className="flex-row justify-between py-sm border-b border-border">
+            <Text className="text-sm text-text-secondary">User</Text>
+            <Text className="text-sm text-text font-medium">{user.username || 'Unknown'}</Text>
           </View>
 
-          <View style={modalStyles.detailRow}>
-            <Text style={modalStyles.label}>Car Brand</Text>
-            <Text style={modalStyles.value}>{user.car_brand || 'Unknown'}</Text>
+          <View className="flex-row justify-between py-sm border-b border-border">
+            <Text className="text-sm text-text-secondary">Car Brand</Text>
+            <Text className="text-sm text-text font-medium">{user.car_brand || 'Unknown'}</Text>
           </View>
 
-          <View style={modalStyles.detailRow}>
-            <Text style={modalStyles.label}>Entry Time</Text>
-            <Text style={modalStyles.value}>
+          <View className="flex-row justify-between py-sm border-b border-border">
+            <Text className="text-sm text-text-secondary">Entry Time</Text>
+            <Text className="text-sm text-text font-medium">
               {new Date(user.entry_time).toLocaleString()}
             </Text>
           </View>
 
-          <View style={modalStyles.detailRow}>
-            <Text style={modalStyles.label}>Duration</Text>
-            <Text style={modalStyles.value}>{formatDuration(user.duration_minutes)}</Text>
+          <View className="flex-row justify-between py-sm border-b border-border">
+            <Text className="text-sm text-text-secondary">Duration</Text>
+            <Text className="text-sm text-text font-medium">{formatDuration(user.duration_minutes)}</Text>
           </View>
 
-          <View style={[modalStyles.detailRow, modalStyles.chargeRow]}>
-            <Text style={modalStyles.chargeLabel}>Estimated Charge</Text>
-            <Text style={modalStyles.chargeValue}>${user.estimated_charge.toFixed(2)}</Text>
+          <View
+            className="flex-row justify-between mt-md pt-md -mx-lg px-lg"
+            style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)' }}
+          >
+            <Text className="text-md font-semibold text-text">Estimated Charge</Text>
+            <Text className="text-lg font-bold text-success">${user.estimated_charge.toFixed(2)}</Text>
           </View>
         </View>
 
         <TouchableOpacity
-          style={[modalStyles.checkoutButton, isLoading && modalStyles.checkoutButtonDisabled]}
+          className={cn(
+            'bg-danger p-lg items-center m-lg rounded-md',
+            isLoading && 'opacity-60'
+          )}
           onPress={handleForceCheckout}
           disabled={isLoading}
         >
           {isLoading ? (
-            <ActivityIndicator color={COLORS.surface} />
+            <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={modalStyles.checkoutButtonText}>Force Checkout</Text>
+            <Text className="text-surface text-md font-semibold">Force Checkout</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -156,20 +166,29 @@ function ActiveUserRow({
   };
 
   return (
-    <TouchableOpacity style={styles.userRow} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.userRowLeft}>
-        <Animated.View style={[styles.pulsingDot, { opacity: pulseAnim }]} />
+    <TouchableOpacity
+      className="flex-row justify-between items-center bg-surface p-md rounded-md mb-sm"
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View className="flex-row items-center">
+        <Animated.View
+          className="w-2.5 h-2.5 rounded-full bg-success mr-sm"
+          style={{ opacity: pulseAnim }}
+        />
         <View>
-          <Text style={styles.plateText}>{user.plate}</Text>
-          <Text style={styles.userText}>
+          <Text className="text-md font-bold text-text" style={{ letterSpacing: 1 }}>
+            {user.plate}
+          </Text>
+          <Text className="text-xs text-text-secondary mt-0.5">
             {user.username || 'Unknown User'}
             {user.car_brand ? ` - ${user.car_brand}` : ''}
           </Text>
         </View>
       </View>
-      <View style={styles.userRowRight}>
-        <Text style={styles.durationText}>{formatDuration(user.duration_minutes)}</Text>
-        <Text style={styles.chargeText}>${user.estimated_charge.toFixed(2)}</Text>
+      <View className="items-end">
+        <Text className="text-sm font-semibold text-text">{formatDuration(user.duration_minutes)}</Text>
+        <Text className="text-xs text-success mt-0.5">${user.estimated_charge.toFixed(2)}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -227,41 +246,41 @@ export function UserManagementScreen() {
 
   if (!selectedLot) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No parking lot selected</Text>
+      <SafeAreaView className="flex-1 bg-background">
+        <View className="flex-1 justify-center items-center">
+          <Text className="text-md font-semibold text-text-secondary">No parking lot selected</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.title}>User Management</Text>
-        <Text style={styles.subtitle}>{selectedLot.name}</Text>
+    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+      <View className="p-lg border-b border-border bg-surface">
+        <Text className="text-xl font-bold text-text">User Management</Text>
+        <Text className="text-sm text-text-secondary mt-xs">{selectedLot.name}</Text>
       </View>
 
-      <View style={styles.searchContainer}>
+      <View className="p-md bg-surface">
         <TextInput
-          style={styles.searchInput}
+          className="bg-background rounded-md p-md text-md text-text"
           placeholder="Search by plate, name, or brand..."
-          placeholderTextColor={COLORS.textLight}
+          placeholderTextColor="#94A3B8"
           value={searchQuery}
           onChangeText={setSearchQuery}
           onSubmitEditing={fetchActiveUsers}
         />
       </View>
 
-      <View style={styles.statsBar}>
-        <Text style={styles.statsText}>
+      <View className="px-lg py-sm" style={{ backgroundColor: 'rgba(37, 99, 235, 0.1)' }}>
+        <Text className="text-sm text-primary font-medium">
           {activeUsers.length} vehicle{activeUsers.length !== 1 ? 's' : ''} currently parked
         </Text>
       </View>
 
       {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color="#2563EB" />
         </View>
       ) : (
         <FlatList
@@ -270,14 +289,14 @@ export function UserManagementScreen() {
           renderItem={({ item }) => (
             <ActiveUserRow user={item} onPress={() => handleUserPress(item)} />
           )}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={{ padding: 16 }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No vehicles currently parked</Text>
-              <Text style={styles.emptySubtext}>
+            <View className="flex-1 justify-center items-center p-xl">
+              <Text className="text-md font-semibold text-text-secondary">No vehicles currently parked</Text>
+              <Text className="text-sm text-text-light mt-xs">
                 Active parking sessions will appear here
               </Text>
             </View>
@@ -297,217 +316,3 @@ export function UserManagementScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    padding: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    backgroundColor: COLORS.surface,
-  },
-  title: {
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  subtitle: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    marginTop: SPACING.xs,
-  },
-  searchContainer: {
-    padding: SPACING.md,
-    backgroundColor: COLORS.surface,
-  },
-  searchInput: {
-    backgroundColor: COLORS.background,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-    fontSize: FONT_SIZES.md,
-    color: COLORS.text,
-  },
-  statsBar: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    backgroundColor: `${COLORS.primary}10`,
-  },
-  statsText: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.primary,
-    fontWeight: '500',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listContent: {
-    padding: SPACING.md,
-  },
-  userRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
-    marginBottom: SPACING.sm,
-  },
-  userRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  pulsingDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: COLORS.success,
-    marginRight: SPACING.sm,
-  },
-  plateText: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '700',
-    color: COLORS.text,
-    letterSpacing: 1,
-  },
-  userText: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  userRowRight: {
-    alignItems: 'flex-end',
-  },
-  durationText: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  chargeText: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.success,
-    marginTop: 2,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING.xl,
-  },
-  emptyText: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-  },
-  emptySubtext: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textLight,
-    marginTop: SPACING.xs,
-  },
-});
-
-const modalStyles = StyleSheet.create({
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    padding: SPACING.lg,
-  },
-  container: {
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.xl,
-    overflow: 'hidden',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  title: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  closeButton: {
-    fontSize: FONT_SIZES.xl,
-    color: COLORS.textSecondary,
-    fontWeight: '300',
-  },
-  content: {
-    padding: SPACING.lg,
-  },
-  plateContainer: {
-    backgroundColor: COLORS.text,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
-    alignSelf: 'center',
-    marginBottom: SPACING.lg,
-  },
-  plateText: {
-    color: COLORS.surface,
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '700',
-    letterSpacing: 2,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: SPACING.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  label: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-  },
-  value: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.text,
-    fontWeight: '500',
-  },
-  chargeRow: {
-    marginTop: SPACING.md,
-    paddingTop: SPACING.md,
-    borderBottomWidth: 0,
-    backgroundColor: `${COLORS.success}10`,
-    marginHorizontal: -SPACING.lg,
-    paddingHorizontal: SPACING.lg,
-  },
-  chargeLabel: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  chargeValue: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '700',
-    color: COLORS.success,
-  },
-  checkoutButton: {
-    backgroundColor: COLORS.danger,
-    padding: SPACING.lg,
-    alignItems: 'center',
-    margin: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
-  },
-  checkoutButtonDisabled: {
-    opacity: 0.6,
-  },
-  checkoutButtonText: {
-    color: COLORS.surface,
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
-  },
-});

@@ -3,7 +3,6 @@ import {
     View,
     Text,
     Modal,
-    StyleSheet,
     ScrollView,
     TouchableOpacity,
     Alert,
@@ -11,7 +10,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Input } from './Input';
 import { Button } from './Button';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../constants';
 
 export interface CreateParkingLotRequest {
     name: string;
@@ -126,25 +124,27 @@ export function AddParkingLotModal({ visible, onClose, onSubmit }: AddParkingLot
             presentationStyle="pageSheet"
             onRequestClose={handleClose}
         >
-            <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+            <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
                 {/* Header */}
-                <View style={styles.header}>
+                <View className="flex-row justify-between items-start px-lg py-md border-b border-border bg-surface">
                     <View>
-                        <Text style={styles.title}>Add Parking Lot</Text>
-                        <Text style={styles.subtitle}>Create a new parking facility</Text>
+                        <Text className="text-xl font-bold text-text">Add Parking Lot</Text>
+                        <Text className="text-sm text-text-secondary mt-xs">
+                            Create a new parking facility
+                        </Text>
                     </View>
                     <TouchableOpacity
                         onPress={handleClose}
                         disabled={isSubmitting}
-                        style={styles.closeButton}
+                        className="p-xs"
                     >
-                        <Text style={styles.closeButtonText}>✕</Text>
+                        <Text className="text-2xl text-text-secondary font-light">✕</Text>
                     </TouchableOpacity>
                 </View>
 
                 <ScrollView
-                    style={styles.content}
-                    contentContainerStyle={styles.scrollContent}
+                    className="flex-1"
+                    contentContainerStyle={{ padding: 24 }}
                     showsVerticalScrollIndicator={false}
                 >
                     {/* Lot Name Input */}
@@ -212,9 +212,9 @@ export function AddParkingLotModal({ visible, onClose, onSubmit }: AddParkingLot
                     />
 
                     {/* Info Box */}
-                    <View style={styles.infoBox}>
-                        <Text style={styles.infoIcon}>ℹ️</Text>
-                        <Text style={styles.infoText}>
+                    <View className="flex-row bg-primary/10 p-md rounded-md mt-md border-l-primary" style={{ borderLeftWidth: 3 }}>
+                        <Text className="text-lg mr-sm">ℹ️</Text>
+                        <Text className="flex-1 text-sm text-text" style={{ lineHeight: 20 }}>
                             The parking lot will be visible to all users once created. You can update these
                             details later in settings.
                         </Text>
@@ -222,86 +222,17 @@ export function AddParkingLotModal({ visible, onClose, onSubmit }: AddParkingLot
                 </ScrollView>
 
                 {/* Footer with Submit Button */}
-                <View style={styles.footer}>
+                <View className="p-lg border-t border-border bg-surface">
                     <Button
                         title="Create Parking Lot"
                         onPress={handleSubmit}
                         loading={isSubmitting}
                         disabled={isSubmitting}
                         size="large"
-                        style={styles.submitButton}
+                        className="w-full"
                     />
                 </View>
             </SafeAreaView>
         </Modal>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        paddingHorizontal: SPACING.lg,
-        paddingVertical: SPACING.md,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
-        backgroundColor: COLORS.surface,
-    },
-    title: {
-        fontSize: FONT_SIZES.xl,
-        fontWeight: '700',
-        color: COLORS.text,
-    },
-    subtitle: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-        marginTop: SPACING.xs,
-    },
-    closeButton: {
-        padding: SPACING.xs,
-    },
-    closeButtonText: {
-        fontSize: FONT_SIZES.xxl,
-        color: COLORS.textSecondary,
-        fontWeight: '300',
-    },
-    content: {
-        flex: 1,
-    },
-    scrollContent: {
-        padding: SPACING.lg,
-    },
-    infoBox: {
-        flexDirection: 'row',
-        backgroundColor: `${COLORS.primary}10`,
-        padding: SPACING.md,
-        borderRadius: BORDER_RADIUS.md,
-        borderLeftWidth: 3,
-        borderLeftColor: COLORS.primary,
-        marginTop: SPACING.md,
-    },
-    infoIcon: {
-        fontSize: FONT_SIZES.lg,
-        marginRight: SPACING.sm,
-    },
-    infoText: {
-        flex: 1,
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.text,
-        lineHeight: 20,
-    },
-    footer: {
-        padding: SPACING.lg,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.border,
-        backgroundColor: COLORS.surface,
-    },
-    submitButton: {
-        width: '100%',
-    },
-});

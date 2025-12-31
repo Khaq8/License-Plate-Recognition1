@@ -42,9 +42,15 @@ def verify_supabase_token(token: str) -> dict:
     Verify a Supabase JWT token.
     Returns the decoded payload if valid.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     try:
         # Try to decode with Supabase JWT secret if available
+        logger.info(f"Verifying token... JWT secret available: {bool(settings.supabase_jwt_secret)}")
+
         if settings.supabase_jwt_secret:
+            logger.info("Using JWT secret for verification")
             payload = jwt.decode(
                 token,
                 settings.supabase_jwt_secret,
@@ -53,9 +59,11 @@ def verify_supabase_token(token: str) -> dict:
             )
         else:
             # Fallback: Use Supabase to verify (makes API call)
+            logger.info("Using Supabase API for token verification")
             supabase = get_supabase()
             user = supabase.auth.get_user(token)
             if user and user.user:
+                logger.info(f"Token verified successfully for user: {user.user.id}")
                 return {
                     "sub": user.user.id,
                     "email": user.user.email,

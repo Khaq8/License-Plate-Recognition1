@@ -1,4 +1,5 @@
 import React from 'react';
+import './global.css';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { enableScreens } from 'react-native-screens';

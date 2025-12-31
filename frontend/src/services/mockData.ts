@@ -23,6 +23,8 @@ export const MOCK_LOTS: ParkingLot[] = [
         capacity: 120,
         hourly_rate: 0.500,
         is_active: true,
+        latitude: 29.3375,
+        longitude: 48.0758,
         created_at: hoursAgo(100),
     },
     {
@@ -33,6 +35,8 @@ export const MOCK_LOTS: ParkingLot[] = [
         capacity: 80,
         hourly_rate: 0.750,
         is_active: true,
+        latitude: 29.3759,
+        longitude: 47.9774,
         created_at: hoursAgo(200),
     },
     {
@@ -43,6 +47,8 @@ export const MOCK_LOTS: ParkingLot[] = [
         capacity: 30,
         hourly_rate: 1.500,
         is_active: true,
+        latitude: 29.0769,
+        longitude: 48.0838,
         created_at: hoursAgo(300),
     }
 ];
