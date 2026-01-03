@@ -90,8 +90,8 @@ class RedisCache:
         data = await self.client.get(key)
         return json.loads(data) if data else None
 
-    async def set_user_active_session(self, user_id: int, session: dict, ttl: int = 3600):
-        """Cache user's active session."""
+    async def set_user_active_session(self, user_id: int, session: dict, ttl: int = 14400):
+        """Cache user's active session (4 hours default - typical mall visit duration)."""
         key = f"user:{user_id}:active_session"
         await self.client.setex(key, ttl, json.dumps(session, default=str))
 
@@ -128,6 +128,68 @@ class RedisCache:
         """Invalidate all caches related to a lot."""
         await self.invalidate_lot_status(lot_id)
         await self.invalidate_active_sessions(lot_id)
+
+    # ============== Pending Detections Queue ==============
+    # Reliability buffer for failed API calls - retried by background worker
+
+    PENDING_ENTRIES_KEY = "queue:pending_entries"
+    PENDING_EXITS_KEY = "queue:pending_exits"
+    FAILED_DETECTIONS_KEY = "queue:failed_detections"
+
+    async def queue_pending_entry(self, detection: dict):
+        """Queue a failed entry detection for retry."""
+        detection["queued_at"] = datetime.utcnow().isoformat()
+        detection["retry_count"] = detection.get("retry_count", 0)
+        await self.client.lpush(self.PENDING_ENTRIES_KEY, json.dumps(detection, default=str))
+
+    async def queue_pending_exit(self, detection: dict):
+        """Queue a failed exit detection for retry."""
+        detection["queued_at"] = datetime.utcnow().isoformat()
+        detection["retry_count"] = detection.get("retry_count", 0)
+        await self.client.lpush(self.PENDING_EXITS_KEY, json.dumps(detection, default=str))
+
+    async def get_pending_entry(self) -> Optional[dict]:
+        """Get next pending entry for processing (FIFO)."""
+        data = await self.client.rpop(self.PENDING_ENTRIES_KEY)
+        return json.loads(data) if data else None
+
+    async def get_pending_exit(self) -> Optional[dict]:
+        """Get next pending exit for processing (FIFO)."""
+        data = await self.client.rpop(self.PENDING_EXITS_KEY)
+        return json.loads(data) if data else None
+
+    async def requeue_failed_entry(self, detection: dict, max_retries: int = 5):
+        """Requeue a failed entry, or move to dead letter queue if max retries exceeded."""
+        detection["retry_count"] = detection.get("retry_count", 0) + 1
+        if detection["retry_count"] > max_retries:
+            await self.client.lpush(self.FAILED_DETECTIONS_KEY, json.dumps(detection, default=str))
+        else:
+            await self.client.lpush(self.PENDING_ENTRIES_KEY, json.dumps(detection, default=str))
+
+    async def requeue_failed_exit(self, detection: dict, max_retries: int = 5):
+        """Requeue a failed exit, or move to dead letter queue if max retries exceeded."""
+        detection["retry_count"] = detection.get("retry_count", 0) + 1
+        if detection["retry_count"] > max_retries:
+            await self.client.lpush(self.FAILED_DETECTIONS_KEY, json.dumps(detection, default=str))
+        else:
+            await self.client.lpush(self.PENDING_EXITS_KEY, json.dumps(detection, default=str))
+
+    async def get_queue_lengths(self) -> dict:
+        """Get current queue lengths for monitoring."""
+        return {
+            "pending_entries": await self.client.llen(self.PENDING_ENTRIES_KEY),
+            "pending_exits": await self.client.llen(self.PENDING_EXITS_KEY),
+            "failed": await self.client.llen(self.FAILED_DETECTIONS_KEY),
+        }
+
+    async def get_failed_detections(self, limit: int = 100) -> list:
+        """Get failed detections for manual review."""
+        data = await self.client.lrange(self.FAILED_DETECTIONS_KEY, 0, limit - 1)
+        return [json.loads(d) for d in data]
+
+    async def clear_failed_detections(self):
+        """Clear the failed detections queue after manual review."""
+        await self.client.delete(self.FAILED_DETECTIONS_KEY)
 
 
 # Global cache instance

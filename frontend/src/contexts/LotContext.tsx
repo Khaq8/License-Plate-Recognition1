@@ -2,7 +2,6 @@ import React, { createContext, useContext, useReducer, useEffect, useCallback } 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ParkingLot, ParkingLotStatus } from '../types';
 import { lotApi } from '../services/api';
-import { useAuth } from './AuthContext';
 
 const LOT_STORAGE_KEY = '@selected_lot_id';
 
@@ -66,7 +65,6 @@ const LotContext = createContext<LotContextType | undefined>(undefined);
 
 export function LotProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(lotReducer, initialState);
-  const auth = useAuth();
 
   // Load lots and restore selected lot on mount
   useEffect(() => {
@@ -106,12 +104,8 @@ export function LotProvider({ children }: { children: React.ReactNode }) {
       const errorMessage = error?.message || '';
       // Detect token-related errors (invalid JWT, expired, wrong algorithm, etc.)
       if (errorMessage.includes('token') || errorMessage.includes('alg') ||
-          errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
-        dispatch({ type: 'SET_ERROR', payload: 'Session expired. Logging out...' });
-        // Auto-logout when token is invalid
-        setTimeout(async () => {
-          await auth.logout();
-        }, 1500);
+        errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        dispatch({ type: 'SET_ERROR', payload: 'Session expired. Please log out and log in again.' });
       } else {
         dispatch({ type: 'SET_ERROR', payload: 'Failed to load parking lots' });
       }

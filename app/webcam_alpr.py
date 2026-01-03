@@ -8,6 +8,7 @@ Integrates with the parking management API to record entry/exit events.
 import json
 import os
 import argparse
+import asyncio
 from datetime import datetime
 from pathlib import Path
 from time import time
@@ -15,9 +16,36 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import requests
+import redis as redis_sync  # Sync Redis client for queueing failed detections
 from app.routers import auth, plate, user, car, parking_lot, parking, admin
 from app.cache import redis_cache
+from app.config import settings
+from app.workers.retry_worker import retry_worker, start_retry_worker
 import cv2
+import logging
+import warnings
+
+# Suppress verbose logging from ALPR/ONNX libraries BEFORE importing them
+warnings.filterwarnings("ignore")
+logging.basicConfig(level=logging.ERROR)
+for logger_name in [
+    "onnxruntime",
+    "open_image_models",
+    "open_image_models.detection",
+    "open_image_models.detection.core",
+    "open_image_models.detection.core.yolo_v9",
+    "open_image_models.detection.core.yolo_v9.inference",
+    "open_image_models.detection.pipeline",
+    "fast_plate_ocr",
+    "fast_plate_ocr.inference",
+    "fast_alpr",
+    "urllib3",
+    "urllib3.connectionpool",
+    "root",
+]:
+    logging.getLogger(logger_name).setLevel(logging.ERROR)
+    logging.getLogger(logger_name).disabled = True
+
 from fast_alpr import ALPR
 
 # Note: Database tables are now managed by Supabase (no SQLAlchemy migration needed)
@@ -35,9 +63,21 @@ async def lifespan(app: FastAPI):
         print(f"FATAL: Could not connect to Redis: {e}")
         raise RuntimeError("Redis connection required. Please ensure Redis is running.")
 
+    # Start the retry worker as a background task
+    print("Starting retry worker...")
+    worker_task = asyncio.create_task(start_retry_worker())
+
     yield
 
-    # Shutdown: Disconnect from Redis
+    # Shutdown: Stop retry worker and disconnect from Redis
+    print("Stopping retry worker...")
+    retry_worker.stop()
+    worker_task.cancel()
+    try:
+        await worker_task
+    except asyncio.CancelledError:
+        pass
+
     print("Disconnecting from Redis...")
     await redis_cache.disconnect()
     print("Redis disconnected")
@@ -160,6 +200,15 @@ class WebcamALPR:
         self.lot_id = lot_id
         self.mode = mode
         self.auth_token = None
+
+        # Initialize sync Redis client for queueing failed detections
+        try:
+            self.redis_client = redis_sync.from_url(settings.redis_url, decode_responses=True)
+            self.redis_client.ping()
+            print("✓ Redis connected for reliability queue")
+        except Exception as e:
+            print(f"⚠ Redis unavailable: {e} (failed detections won't be queued)")
+            self.redis_client = None
 
         # Authenticate with the API
         if admin_email and admin_password:
@@ -313,9 +362,35 @@ class WebcamALPR:
             # Otherwise, this is an entry
             return plate_text not in self.active_plates
 
+    def _queue_failed_detection(self, plate_text, confidence, is_entry, error_reason):
+        """Queue a failed detection to Redis for retry by background worker."""
+        if not self.redis_client:
+            print(f"  → Cannot queue (Redis unavailable)")
+            return False
+
+        detection = {
+            "plate": plate_text,
+            "confidence": confidence,
+            "lot_id": self.lot_id,
+            "timestamp": datetime.utcnow().isoformat(),
+            "error_reason": error_reason,
+        }
+
+        try:
+            queue_key = "queue:pending_entries" if is_entry else "queue:pending_exits"
+            detection["queued_at"] = datetime.utcnow().isoformat()
+            detection["retry_count"] = 0
+            self.redis_client.lpush(queue_key, json.dumps(detection))
+            print(f"  → Queued for retry")
+            return True
+        except Exception as e:
+            print(f"  → Failed to queue: {e}")
+            return False
+
     def _record_parking_event(self, plate_text, confidence, is_entry):
         """
         Record entry or exit via the parking management API.
+        Failed detections are queued to Redis for retry.
 
         Args:
             plate_text: The plate text
@@ -343,8 +418,13 @@ class WebcamALPR:
                 elif response.status_code == 400:
                     error = response.json().get("detail", "Unknown error")
                     print(f"⚠ Entry rejected: {error}")
+                    # Don't queue 400 errors - they're intentional rejections (duplicates, lot full, etc.)
+                elif response.status_code == 401:
+                    print(f"✗ Entry failed (auth expired): {response.text}")
+                    self._queue_failed_detection(plate_text, confidence, True, "auth_expired")
                 else:
                     print(f"✗ Entry failed ({response.status_code}): {response.text}")
+                    self._queue_failed_detection(plate_text, confidence, True, f"http_{response.status_code}")
             else:
                 # Record exit
                 response = requests.post(
@@ -367,10 +447,21 @@ class WebcamALPR:
                     if self.mode == "auto":
                         print(f"  → Treating as entry instead")
                         self._record_parking_event(plate_text, confidence, is_entry=True)
+                elif response.status_code == 401:
+                    print(f"✗ Exit failed (auth expired): {response.text}")
+                    self._queue_failed_detection(plate_text, confidence, False, "auth_expired")
                 else:
                     print(f"✗ Exit failed ({response.status_code}): {response.text}")
+                    self._queue_failed_detection(plate_text, confidence, False, f"http_{response.status_code}")
+        except requests.exceptions.Timeout:
+            print(f"✗ API timeout")
+            self._queue_failed_detection(plate_text, confidence, is_entry, "timeout")
+        except requests.exceptions.ConnectionError:
+            print(f"✗ API connection error")
+            self._queue_failed_detection(plate_text, confidence, is_entry, "connection_error")
         except Exception as e:
             print(f"✗ API error: {e}")
+            self._queue_failed_detection(plate_text, confidence, is_entry, str(e))
 
 
     def run(self, camera_index=0):
@@ -386,6 +477,15 @@ class WebcamALPR:
         if not cap.isOpened():
             print("Error: Could not open webcam.")
             return
+
+        # Camera warmup - discard first few frames to let camera stabilize
+        print("Warming up camera...")
+        for _ in range(30):  # Read 30 frames to warm up
+            ret, _ = cap.read()
+            if not ret:
+                import time
+                time.sleep(0.1)  # Small delay if frame not ready
+        print("Camera ready.")
 
         # Get camera properties
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))

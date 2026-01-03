@@ -69,19 +69,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Clear stored credentials helper
   const clearStoredCredentials = async () => {
+    console.log('[AuthContext] Clearing stored credentials...');
     try {
       await SecureStore.deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN);
       await SecureStore.deleteItemAsync(STORAGE_KEYS.USER_DATA);
+      console.log('[AuthContext] Credentials cleared successfully');
     } catch (e) {
-      console.error('Error clearing credentials:', e);
+      console.error('[AuthContext] Error clearing credentials:', e);
     }
   };
 
   // Restore token on app load
   useEffect(() => {
     async function restoreToken() {
+      console.log('[AuthContext] Attempting to restore token...');
       try {
         if (USE_MOCK_DATA) {
+          console.log('[AuthContext] Using mock data, restoring mock user');
           dispatch({
             type: 'RESTORE_TOKEN',
             payload: { user: MOCK_ADMIN_USER, token: 'mock-token-admin' }
@@ -91,25 +95,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const token = await SecureStore.getItemAsync(STORAGE_KEYS.AUTH_TOKEN);
         const userDataStr = await SecureStore.getItemAsync(STORAGE_KEYS.USER_DATA);
 
+        console.log('[AuthContext] Token found:', !!token);
+        console.log('[AuthContext] User data found:', !!userDataStr);
+
         if (token && userDataStr) {
           // Validate token format (JWT has 3 parts separated by dots)
           const parts = token.split('.');
           if (parts.length !== 3) {
-            // CWE-532 mitigation: no sensitive data in logs
-            console.warn('Invalid token format detected');
+            console.warn('[AuthContext] Invalid token format detected (not a JWT)');
             await clearStoredCredentials();
             dispatch({ type: 'SET_LOADING', payload: false });
             return;
           }
 
           const user = JSON.parse(userDataStr) as User;
+          console.log('[AuthContext] Restoring session for user:', user.email);
           dispatch({ type: 'RESTORE_TOKEN', payload: { user, token } });
         } else {
+          console.log('[AuthContext] No stored credentials found, user needs to login');
           dispatch({ type: 'SET_LOADING', payload: false });
         }
       } catch (error) {
-        // CWE-532 mitigation: sanitized error logging without sensitive data
-        console.error('Token restoration failed');
+        console.error('[AuthContext] Token restoration failed:', error);
         // Clear potentially corrupted credentials
         await clearStoredCredentials();
         dispatch({ type: 'SET_LOADING', payload: false });
@@ -120,28 +127,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    console.log('[AuthContext] Login attempt for:', email);
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
 
-      // // TODO: Remove hardcoded credentials before production
-      // // Test credentials: admin:1234 (full access) | user:1234 (limited access)
-      // if ((email === 'admin' || email === 'user') && password === '1234') {
-      //   const isAdminUser = email === 'admin';
-      //   const user: User = {
-      //     id: isAdminUser ? '1' : '2',
-      //     email: isAdminUser ? 'admin@parkinglot.com' : 'user@parkinglot.com',
-      //     name: isAdminUser ? 'Admin' : 'User',
-      //     role: isAdminUser ? 'admin' : 'user',
-      //   };
-      //   const testToken = `test-token-${email}`;
-
-      //   await SecureStore.setItemAsync(STORAGE_KEYS.AUTH_TOKEN, testToken);
-      //   await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
-
-      //   dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token: testToken } });
-      //   return { success: true };
-      // }
-
+      console.log('[AuthContext] Sending login request to:', `${API_BASE_URL}/auth/login`);
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
@@ -150,12 +140,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email, password }),
       });
 
+      console.log('[AuthContext] Login response status:', response.status);
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('[AuthContext] Login failed:', errorData);
         throw new Error(errorData.detail || 'Invalid credentials');
       }
 
       const data: LoginResponse = await response.json();
+      console.log('[AuthContext] Login successful, user:', data.user?.email);
 
       // Use user data from login response
       const user: User = {
@@ -166,13 +160,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
 
       // Store token and user data securely
+      console.log('[AuthContext] Storing credentials in SecureStore');
       await SecureStore.setItemAsync(STORAGE_KEYS.AUTH_TOKEN, data.access_token);
       await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
 
       dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token: data.access_token } });
+      console.log('[AuthContext] Login complete, user authenticated');
 
       return { success: true };
     } catch (error) {
+      console.error('[AuthContext] Login error:', error);
       dispatch({ type: 'SET_LOADING', payload: false });
       return {
         success: false,
@@ -182,13 +179,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    console.log('[AuthContext] Logout initiated');
     try {
+      console.log('[AuthContext] Deleting stored credentials...');
       await SecureStore.deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN);
       await SecureStore.deleteItemAsync(STORAGE_KEYS.USER_DATA);
+      console.log('[AuthContext] Credentials deleted successfully');
       dispatch({ type: 'LOGOUT' });
+      console.log('[AuthContext] Logout complete, user unauthenticated');
     } catch (error) {
-      // CWE-532 mitigation: sanitized error logging
-      console.error('Logout failed');
+      console.error('[AuthContext] Logout error:', error);
+      // Still dispatch logout to clear state even if SecureStore fails
       dispatch({ type: 'LOGOUT' });
     }
   };

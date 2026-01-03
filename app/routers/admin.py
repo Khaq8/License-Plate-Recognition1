@@ -374,3 +374,43 @@ async def set_admin_status(
     }).eq("id", user_id).execute()
 
     return {"message": f"Admin status {'granted' if is_admin else 'revoked'} for user {user_id}"}
+
+
+# ============== Queue Monitoring Endpoints ==============
+
+@router.get("/queue/status")
+async def get_queue_status(
+    admin: CurrentUser = Depends(get_current_admin)
+):
+    """Get the status of the retry queue (admin only)."""
+    from app.workers.retry_worker import retry_worker
+
+    queue_lengths = await redis_cache.get_queue_lengths()
+    worker_stats = retry_worker.get_stats()
+
+    return {
+        "queue": queue_lengths,
+        "worker": worker_stats,
+    }
+
+
+@router.get("/queue/failed")
+async def get_failed_detections(
+    limit: int = Query(default=100, le=500),
+    admin: CurrentUser = Depends(get_current_admin)
+):
+    """Get failed detections that exceeded max retries (admin only)."""
+    failed = await redis_cache.get_failed_detections(limit)
+    return {
+        "count": len(failed),
+        "detections": failed,
+    }
+
+
+@router.delete("/queue/failed")
+async def clear_failed_detections(
+    admin: CurrentUser = Depends(get_current_admin)
+):
+    """Clear the failed detections queue after manual review (admin only)."""
+    await redis_cache.clear_failed_detections()
+    return {"message": "Failed detections queue cleared"}

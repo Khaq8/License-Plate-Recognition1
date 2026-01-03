@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL, STORAGE_KEYS } from '../constants';
-import { PlateDetection, ParkingEntry, ParkingStats, ParkingLot, ParkingLotStatus, ActiveUserInLot, ForceCheckoutResponse, Car, CreateCarRequest } from '../types';
+import { PlateDetection, ParkingEntry, ParkingStats, ParkingLot, ParkingLotStatus, ActiveUserInLot, ForceCheckoutResponse, Car, CreateCarRequest, ParkingSession } from '../types';
 
 // Helper to get auth header
 async function getAuthHeader(): Promise<Record<string, string>> {
@@ -249,6 +249,22 @@ export const parkingApi = {
     return fetchWithAuth<ForceCheckoutResponse>(`/parking/sessions/${sessionId}/force-checkout`, {
       method: 'POST',
     });
+  },
+
+  // Get user's parking sessions with details (for Activity screen)
+  getMySessionsDetailed: async (
+    activeOnly: boolean = false,
+    skip: number = 0,
+    limit: number = 50
+  ): Promise<ParkingSession[]> => {
+    const params = new URLSearchParams();
+    if (activeOnly) params.append('active_only', 'true');
+    if (skip > 0) params.append('skip', skip.toString());
+    if (limit !== 50) params.append('limit', limit.toString());
+    const queryString = params.toString();
+    return fetchWithAuth<ParkingSession[]>(
+      `/parking/my-sessions-detailed${queryString ? `?${queryString}` : ''}`
+    );
   },
 };
 

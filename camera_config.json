@@ -1,19 +1,14 @@
 {
   "lots": {
-    "main-a": {
+    "hamra": {
       "lot_id": 1,
-      "name": "Main Entrance A",
-      "description": "Salmiya Block 4 - Main parking facility"
+      "name": "Al Hamra Tower & Mall Parking",
+      "description": "Al Shuhada St, Sharq - Kuwait City"
     },
-    "underground-p2": {
+    "360mall": {
       "lot_id": 2,
-      "name": "Underground P2",
-      "description": "Kuwait City Floor -2 - Underground parking"
-    },
-    "vip-surface": {
-      "lot_id": 3,
-      "name": "VIP Surface Lot",
-      "description": "Ahmadi East Wing - Premium parking area"
+      "name": "360 Mall Parking",
+      "description": "Faris Abdulrahman Al Waqayan St (46 St) - Kuwait City"
     }
   },
   "defaults": {

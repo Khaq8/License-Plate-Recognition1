@@ -272,6 +272,8 @@ async def record_entry(
             "plate": plate,
             "entry_time": session["entry_time"]
         })
+        # Invalidate user activity cache
+        await redis_cache.invalidate(f"user:{session['user_id']}:activity")
 
     return ParkingSessionResponse(**session)
 
@@ -343,8 +345,10 @@ async def record_exit(
     await redis_cache.invalidate_lot(lot_id)
     if session.get("user_id"):
         await redis_cache.clear_user_active_session(session["user_id"])
+        await redis_cache.invalidate(f"user:{session['user_id']}:activity")
     if charged_user_id and charged_user_id != session.get("user_id"):
         await redis_cache.clear_user_active_session(charged_user_id)
+        await redis_cache.invalidate(f"user:{charged_user_id}:activity")
 
     return ParkingSessionResponse(**updated_session)
 
@@ -415,8 +419,10 @@ async def force_checkout(
     await redis_cache.invalidate_lot(session["lot_id"])
     if session.get("user_id"):
         await redis_cache.clear_user_active_session(session["user_id"])
+        await redis_cache.invalidate(f"user:{session['user_id']}:activity")
     if charged_user_id and charged_user_id != session.get("user_id"):
         await redis_cache.clear_user_active_session(charged_user_id)
+        await redis_cache.invalidate(f"user:{charged_user_id}:activity")
 
     return ForceCheckoutResponse(
         session=ParkingSessionResponse(**updated_session),
@@ -505,6 +511,82 @@ async def get_my_sessions(
     result = query.order("entry_time", desc=True).range(skip, skip + limit - 1).execute()
 
     return [ParkingSessionResponse(**s) for s in result.data]
+
+
+@router.get("/my-sessions-detailed", response_model=List[ParkingSessionWithDetails])
+async def get_my_sessions_detailed(
+    active_only: bool = False,
+    skip: int = 0,
+    limit: int = 50,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Get the current user's parking sessions with lot and car details."""
+    supabase = get_supabase_admin()
+
+    # Try cache first
+    cache_key = f"user:{current_user.id}:activity"
+    if not active_only and skip == 0:
+        cached = await redis_cache.get_cached(cache_key)
+        if cached:
+            return [ParkingSessionWithDetails(**s) for s in cached[:limit]]
+
+    # Get user's registered cars to find all sessions for their plates
+    user_cars = supabase.table("cars").select("license_plate, brand, model").eq(
+        "user_id", current_user.id
+    ).execute()
+
+    if not user_cars.data:
+        return []
+
+    # Create plate to car details mapping
+    plate_to_car = {
+        car["license_plate"]: {"brand": car.get("brand"), "model": car.get("model")}
+        for car in user_cars.data
+    }
+    user_plates = list(plate_to_car.keys())
+
+    # Query sessions for user's plates (includes sessions where user wasn't charged but owns the car)
+    query = supabase.table("parking_sessions").select("*").in_("plate", user_plates)
+
+    if active_only:
+        query = query.eq("status", "active").is_("exit_time", "null")
+
+    result = query.order("entry_time", desc=True).range(skip, skip + limit - 1).execute()
+
+    # Enrich with details
+    results = []
+    lot_cache = {}
+
+    for session in result.data:
+        # Get lot name (with simple in-memory cache for this request)
+        lot_name = None
+        lot_id = session.get("lot_id")
+        if lot_id:
+            if lot_id not in lot_cache:
+                lot = supabase.table("parking_lots").select("name").eq("id", lot_id).execute()
+                lot_cache[lot_id] = lot.data[0] if lot.data else {}
+            lot_name = lot_cache[lot_id].get("name")
+
+        # Get car details from our mapping
+        car_info = plate_to_car.get(session["plate"], {})
+
+        # Calculate duration if not set
+        duration = session.get("duration_minutes")
+        if not duration:
+            duration = get_duration_minutes(session["entry_time"], session.get("exit_time"))
+
+        session_dict = {**session, "duration_minutes": duration}
+        session_dict["lot_name"] = lot_name
+        session_dict["username"] = None  # Not needed for own sessions
+        session_dict["car_brand"] = car_info.get("brand")
+
+        results.append(ParkingSessionWithDetails(**session_dict))
+
+    # Cache the results for quick access (5 min TTL)
+    if not active_only and skip == 0 and results:
+        await redis_cache.set_cached(cache_key, [s.model_dump() for s in results], ttl=300)
+
+    return results
 
 
 @router.get("/my-active-session", response_model=Optional[ParkingSessionResponse])

@@ -17,7 +17,8 @@
       "mcp__plugin_exa-mcp-server_exa__web_search_exa",
       "mcp__plugin_exa-mcp-server_exa__get_code_context_exa",
       "Bash(wc:*)",
-      "Bash(bun add:*)"
+      "Bash(bun add:*)",
+      "Bash(pip3:*)"
     ],
     "deny": [],
     "ask": []

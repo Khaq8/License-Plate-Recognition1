@@ -9,8 +9,10 @@
 6. [Core Use Cases](#6-core-use-cases)
 7. [Sequence Diagrams](#7-sequence-diagrams)
 8. [API Endpoints](#8-api-endpoints)
-9. [Caching Strategy](#9-caching-strategy)
-10. [Business Rules](#10-business-rules)
+9. [Redis Architecture](#9-redis-architecture)
+10. [Reliability Queue System](#10-reliability-queue-system)
+11. [Business Rules](#11-business-rules)
+12. [Deployment & Infrastructure](#12-deployment--infrastructure)
 
 ---
 
@@ -24,7 +26,9 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
 - Multi-owner vehicle support with priority-based billing
 - Credit balance management with transaction history
 - Admin dashboard for lot management and manual interventions
-- Mobile app for users to monitor parking sessions
+- Mobile app for users to monitor parking sessions and activity history
+- **Redis-based reliability queue** for failed detection recovery
+- **Background worker** for automatic retry of failed API calls
 
 ---
 
@@ -37,15 +41,16 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
 │                                                                                  │
 │   ┌──────────────────────┐              ┌──────────────────────┐                │
 │   │   React Native App   │              │    ALPR Camera       │                │
-│   │   (Expo + TypeScript)│              │    Integration       │                │
+│   │   (Expo + TypeScript)│              │    (webcam_alpr.py)  │                │
 │   │                      │              │                      │                │
 │   │  • AuthContext       │              │  • OpenCV            │                │
 │   │  • LotContext        │              │  • fast-alpr         │                │
 │   │  • Navigation        │              │  • ONNX Runtime      │                │
+│   │  • Activity Screen   │              │  • Redis Queue       │                │
 │   └──────────┬───────────┘              └──────────┬───────────┘                │
 │              │                                     │                             │
 └──────────────┼─────────────────────────────────────┼─────────────────────────────┘
-               │ HTTPS (JWT Auth)                    │ Internal
+               │ HTTPS (JWT Auth)                    │ HTTP + Redis
                ▼                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                              API LAYER                                           │
@@ -57,18 +62,18 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
 │   ├─────────────────────────────────────────────────────────────────────────┤   │
 │   │                                                                          │   │
 │   │   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐    │   │
-│   │   │ auth.py     │  │ parking.py  │  │parking_lot.py│ │  car.py     │    │   │
+│   │   │ auth.py     │  │ parking.py  │  │parking_lot.py│ │  admin.py   │    │   │
 │   │   │             │  │             │  │             │  │             │    │   │
-│   │   │ • signup    │  │ • entry     │  │ • CRUD lots │  │ • register  │    │   │
-│   │   │ • login     │  │ • exit      │  │ • status    │  │ • list      │    │   │
-│   │   │ • refresh   │  │ • force-out │  │ • active    │  │ • delete    │    │   │
-│   │   │ • logout    │  │ • sessions  │  │   vehicles  │  │             │    │   │
+│   │   │ • signup    │  │ • entry     │  │ • CRUD lots │  │ • users     │    │   │
+│   │   │ • login     │  │ • exit      │  │ • status    │  │ • queue     │    │   │
+│   │   │ • refresh   │  │ • force-out │  │ • active    │  │   status    │    │   │
+│   │   │ • logout    │  │ • sessions  │  │   vehicles  │  │ • billing   │    │   │
 │   │   └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘    │   │
 │   │                                                                          │   │
 │   │   ┌─────────────────────────────────────────────────────────────────┐   │   │
-│   │   │                     security.py                                  │   │   │
-│   │   │  • JWT verification (python-jose)                                │   │   │
-│   │   │  • get_current_user / get_current_admin dependencies             │   │   │
+│   │   │                     Background Workers                          │   │   │
+│   │   │  • retry_worker.py - Processes failed detections from Redis     │   │   │
+│   │   │  • Runs as asyncio task within FastAPI lifespan                 │   │   │
 │   │   └─────────────────────────────────────────────────────────────────┘   │   │
 │   │                                                                          │   │
 │   └─────────────────────────────────────────────────────────────────────────┘   │
@@ -77,25 +82,29 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
                                │                          │
                                ▼                          ▼
 ┌──────────────────────────────────────────┐  ┌────────────────────────────────────┐
-│           CACHE LAYER                     │  │         DATA LAYER                 │
+│           CACHE LAYER (Redis)            │  │         DATA LAYER                 │
 ├──────────────────────────────────────────┤  ├────────────────────────────────────┤
 │                                          │  │                                    │
 │   ┌──────────────────────────────────┐   │  │   ┌────────────────────────────┐   │
-│   │            Redis                 │   │  │   │     Supabase               │   │
+│   │         CACHING                  │   │  │   │     Supabase               │   │
 │   │                                  │   │  │   │                            │   │
-│   │  • lot_status:{lot_id}    5min   │   │  │   │  ┌──────────────────────┐  │   │
-│   │  • active_sessions:{lot_id} 5min │   │  │   │  │   PostgreSQL DB      │  │   │
-│   │  • plate_seen:{plate}:{lot} 5sec │   │  │   │  │   (with RLS)         │  │   │
-│   │  • user_session:{user_id}  5min  │   │  │   │  └──────────────────────┘  │   │
-│   │                                  │   │  │   │                            │   │
+│   │  • lot:{id}:status       30s     │   │  │   │  ┌──────────────────────┐  │   │
+│   │  • lot:{id}:active_sessions 60s  │   │  │   │  │   PostgreSQL DB      │  │   │
+│   │  • plate:{plate}:last_seen  5s   │   │  │   │  │   (with RLS)         │  │   │
+│   │  • user:{id}:active_session 4hr  │   │  │   │  └──────────────────────┘  │   │
+│   │  • user:{id}:activity      5min  │   │  │   │                            │   │
 │   └──────────────────────────────────┘   │  │   │  ┌──────────────────────┐  │   │
 │                                          │  │   │  │   Supabase Auth      │  │   │
-└──────────────────────────────────────────┘  │   │  │   (JWT Provider)     │  │   │
-                                              │   │  └──────────────────────┘  │   │
-                                              │   │                            │   │
-                                              │   └────────────────────────────┘   │
-                                              │                                    │
-                                              └────────────────────────────────────┘
+│   ┌──────────────────────────────────┐   │  │   │  │   (JWT Provider)     │  │   │
+│   │         QUEUES                   │   │  │   │  └──────────────────────┘  │   │
+│   │                                  │   │  │   │                            │   │
+│   │  • queue:pending_entries         │   │  │   └────────────────────────────┘   │
+│   │  • queue:pending_exits           │   │  │                                    │
+│   │  • queue:failed_detections       │   │  │                                    │
+│   │    (dead letter queue)           │   │  │                                    │
+│   └──────────────────────────────────┘   │  │                                    │
+│                                          │  │                                    │
+└──────────────────────────────────────────┘  └────────────────────────────────────┘
 ```
 
 ---
@@ -109,7 +118,9 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
 | ASGI Server | Uvicorn | High-performance async server |
 | Database | Supabase (PostgreSQL) | Relational data with Row-Level Security |
 | Authentication | Supabase Auth + python-jose | JWT-based auth with HS256 signing |
-| Caching | Redis | Session caching, duplicate detection |
+| Caching | Redis (async) | Session caching, duplicate detection |
+| Queuing | Redis Lists | Reliability queue for failed detections |
+| Background Worker | asyncio Task | Retry failed API calls automatically |
 | Computer Vision | OpenCV + fast-alpr + ONNX | License plate recognition |
 
 ### Frontend
@@ -118,15 +129,17 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
 | Framework | React Native (Expo) | Cross-platform mobile app |
 | Language | TypeScript | Type-safe JavaScript |
 | State Management | React Context API | AuthContext, LotContext |
+| Styling | NativeWind (Tailwind) | Utility-first CSS |
 | Secure Storage | expo-secure-store | JWT token storage |
-| Local Storage | AsyncStorage | User preferences |
 | Navigation | React Navigation | Stack + Tab navigation |
 
 ### Infrastructure
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| Containerization | Docker | Consistent deployment |
-| CI/CD | GitHub Actions | Automated testing and deployment |
+| Containerization | Docker + Docker Compose | Consistent deployment |
+| API Container | Python 3.12 + FastAPI | Backend service |
+| Cache Container | Redis 7 Alpine | Caching and queuing |
+| Database | Supabase (hosted) | Managed PostgreSQL |
 
 ---
 
@@ -152,6 +165,17 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
 │  • View all sessions across all lots                             │
 │  • View currently parked vehicles                                │
 ├─────────────────────────────────────────────────────────────────┤
+│  USER MANAGEMENT                                                 │
+│  • View all users with details                                   │
+│  • Top up user credit balance                                    │
+│  • Charge users manually                                         │
+│  • Grant/revoke admin status                                     │
+├─────────────────────────────────────────────────────────────────┤
+│  QUEUE MONITORING                                                │
+│  • View queue status (pending entries/exits)                     │
+│  • View failed detections (dead letter queue)                    │
+│  • Clear failed detections after review                          │
+├─────────────────────────────────────────────────────────────────┤
 │  INHERITS ALL USER PERMISSIONS                                   │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -166,7 +190,7 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
 │  • View real-time lot occupancy/status                           │
 ├─────────────────────────────────────────────────────────────────┤
 │  PERSONAL DATA ACCESS                                            │
-│  • View own parking session history                              │
+│  • View own parking session history (Activity tab)               │
 │  • View current active parking session                           │
 │  • Register vehicles to account                                  │
 │  • Manage credit balance                                         │
@@ -174,22 +198,15 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Access Control Matrix
+### Mobile App Navigation by Role
 
-| Resource | Endpoint | Admin | User | Anonymous |
-|----------|----------|-------|------|-----------|
-| Create lot | `POST /lots/` | Yes | No | No |
-| Update lot | `PUT /lots/{id}` | Yes | No | No |
-| Delete lot | `DELETE /lots/{id}` | Yes | No | No |
-| List lots | `GET /lots/` | All | Active only | No |
-| Lot status | `GET /lots/{id}/status` | Yes | Yes | No |
-| Active vehicles | `GET /lots/{id}/active` | Yes | No | No |
-| Record entry | `POST /parking/{lot}/entry` | Yes | No | No |
-| Record exit | `POST /parking/{lot}/exit` | Yes | No | No |
-| Force checkout | `POST /parking/sessions/{id}/force-checkout` | Yes | No | No |
-| All sessions | `GET /parking/sessions` | Yes | No | No |
-| My sessions | `GET /parking/my-sessions` | Yes | Yes | No |
-| My active | `GET /parking/my-active-session` | Yes | Yes | No |
+| Tab | Admin | User |
+|-----|-------|------|
+| Home (Dashboard) | Yes | Yes |
+| Log (All Sessions) | Yes | No |
+| Activity (My Sessions) | No | Yes |
+| Users (Management) | Yes | No |
+| Settings | Yes | Yes |
 
 ---
 
@@ -268,78 +285,6 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
     └─────────────────────┘
 ```
 
-### Table Definitions
-
-#### profiles
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | uuid | PK, FK→auth.users | Links to Supabase Auth |
-| username | text | UNIQUE, NOT NULL | Display name |
-| email | text | UNIQUE | User email |
-| phone | text | | Contact number |
-| is_admin | boolean | DEFAULT false | Role flag |
-| credit_balance | numeric | DEFAULT 0.00 | Wallet balance |
-| first_name | text | | |
-| last_name | text | | |
-| created_at | timestamptz | DEFAULT now() | |
-
-#### cars
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | integer | PK, SERIAL | |
-| user_id | uuid | FK→profiles, NOT NULL | Owner |
-| license_plate | text | NOT NULL | Plate number |
-| brand | text | | Car brand |
-| model | text | | Car model |
-| color | text | | Car color |
-| owner_priority | smallint | CHECK 1-3, DEFAULT 1 | Billing priority |
-| is_primary | boolean | DEFAULT false | Primary vehicle flag |
-| created_at | timestamptz | DEFAULT now() | |
-
-#### parking_lots
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | integer | PK, SERIAL | |
-| name | text | UNIQUE, NOT NULL | Lot name |
-| address | text | | Street address |
-| city | text | | City |
-| capacity | integer | CHECK > 0, NOT NULL | Total spots |
-| hourly_rate | numeric | CHECK >= 0, DEFAULT 1.00 | $/hour |
-| is_active | boolean | DEFAULT true | Soft delete flag |
-| latitude | numeric | | GPS lat |
-| longitude | numeric | | GPS long |
-| created_at | timestamptz | DEFAULT now() | |
-
-#### parking_sessions
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | integer | PK, SERIAL | |
-| lot_id | integer | FK→parking_lots, NOT NULL | |
-| car_id | integer | FK→cars, NULLABLE | Matched car |
-| plate | text | NOT NULL | Scanned plate |
-| user_id | uuid | FK→profiles, NULLABLE | Charged user |
-| entry_time | timestamptz | DEFAULT now() | |
-| exit_time | timestamptz | NULLABLE | NULL = still parked |
-| entry_confidence | real | | ALPR confidence |
-| exit_confidence | real | | ALPR confidence |
-| duration_minutes | integer | | Calculated on exit |
-| amount_charged | numeric | | Final charge |
-| status | text | CHECK (active, completed) | |
-| is_force_checkout | boolean | DEFAULT false | Manual checkout flag |
-| created_at | timestamptz | DEFAULT now() | |
-
-#### transactions
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | integer | PK, SERIAL | |
-| user_id | uuid | FK→profiles, NOT NULL | |
-| session_id | integer | FK→parking_sessions | |
-| type | text | CHECK (payment, top_up, refund, penalty) | |
-| amount | numeric | NOT NULL | +/- value |
-| balance_after | numeric | NOT NULL | Running balance |
-| description | text | | Human-readable |
-| created_at | timestamptz | DEFAULT now() | |
-
 ---
 
 ## 6. Core Use Cases
@@ -368,22 +313,25 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
           │                                                        │
           │    ┌─────────────────────────────────────────┐         │
           ├───►│         Process Vehicle Entry           │         │
-          │    │  • Scan license plate                   │         │
+          │    │  • Scan license plate (camera)          │         │
           │    │  • Validate capacity                    │         │
           │    │  • Create parking session               │         │
+          │    │  • Queue on failure (Redis)             │         │
           │    └─────────────────────────────────────────┘         │
           │                                                        │
           │    ┌─────────────────────────────────────────┐         │
           ├───►│         Process Vehicle Exit            │         │
-          │    │  • Scan license plate                   │         │
+          │    │  • Scan license plate (camera)          │         │
           │    │  • Calculate charges                    │         │
-          │    │  • Process payment                      │         │
+          │    │  • Process payment (priority billing)   │         │
+          │    │  • Queue on failure (Redis)             │         │
           │    └─────────────────────────────────────────┘         │
           │                                                        │
           │    ┌─────────────────────────────────────────┐         │
-          ├───►│         Force Checkout                  │         │
-          │    │  • Manual session closure               │         │
-          │    │  • Override billing                     │         │
+          ├───►│         Monitor Queue Status            │         │
+          │    │  • View pending entries/exits           │         │
+          │    │  • View failed detections               │         │
+          │    │  • Clear dead letter queue              │         │
           │    └─────────────────────────────────────────┘         │
           │                                                        │
           │    ┌─────────────────────────────────────────┐         │
@@ -396,22 +344,17 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
           │    │  • Available spots                      │         │
           │    └─────────────────────────────────────────┘         │
           │                                                        │
-          │    ┌─────────────────────────────────────────┐         │
-          └───►│         View Active Vehicles            │         │
-               │  • Currently parked cars                │         │
+               ┌─────────────────────────────────────────┐         │
+               │         View Activity History           │◄────────┤
+               │  • My parking sessions                  │         │
+               │  • Entry/exit times                     │         │
+               │  • Charges and duration                 │         │
                └─────────────────────────────────────────┘         │
                                                                    │
                ┌─────────────────────────────────────────┐         │
                │         Register Vehicle                │◄────────┤
                │  • Link plate to account                │         │
                │  • Set owner priority                   │         │
-               └─────────────────────────────────────────┘         │
-                                                                   │
-               ┌─────────────────────────────────────────┐         │
-               │         Manage Account                  │◄────────┤
-               │  • View balance                         │         │
-               │  • Top up credits                       │         │
-               │  • View transaction history             │         │
                └─────────────────────────────────────────┘         │
                                                                    │
                ┌─────────────────────────────────────────┐         │
@@ -426,71 +369,63 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
 
 ## 7. Sequence Diagrams
 
-### 7.1 Vehicle Entry Flow
+### 7.1 Vehicle Entry Flow (with Reliability Queue)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                        SEQUENCE DIAGRAM: VEHICLE ENTRY                           │
+│                   SEQUENCE DIAGRAM: VEHICLE ENTRY WITH QUEUE                     │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 ┌────────┐    ┌────────┐    ┌────────┐    ┌────────┐    ┌────────┐    ┌────────┐
-│ Camera │    │  API   │    │ Redis  │    │Supabase│    │profiles│    │sessions│
+│ Camera │    │  API   │    │ Redis  │    │Supabase│    │ Queue  │    │ Worker │
 └───┬────┘    └───┬────┘    └───┬────┘    └───┬────┘    └───┬────┘    └───┬────┘
     │             │             │             │             │             │
     │ POST /parking/{lot}/entry │             │             │             │
     │ {plate: "ABC123"}         │             │             │             │
     │────────────────────────────►            │             │             │
     │             │             │             │             │             │
-    │             │ check_duplicate_entry     │             │             │
-    │             │ (plate, lot_id)           │             │             │
+    │             │ ═══════════════════════════════════════════════════════
+    │             │ ║               SUCCESS PATH                          ║
+    │             │ ═══════════════════════════════════════════════════════
+    │             │             │             │             │             │
+    │             │ check_duplicate           │             │             │
     │             │────────────►│             │             │             │
+    │             │◄────────────│ OK          │             │             │
     │             │             │             │             │             │
-    │             │◄────────────│             │             │             │
-    │             │ false (not duplicate)     │             │             │
-    │             │             │             │             │             │
-    │             │ SELECT * FROM parking_sessions          │             │
-    │             │ WHERE plate='ABC123' AND status='active'│             │
+    │             │ INSERT parking_session    │             │             │
     │             │──────────────────────────►│             │             │
+    │             │◄──────────────────────────│ session_id  │             │
     │             │             │             │             │             │
-    │             │◄──────────────────────────│             │             │
-    │             │ [] (no active session)    │             │             │
+    │             │ set_user_active_session   │             │             │
+    │             │────────────►│ (4hr TTL)   │             │             │
     │             │             │             │             │             │
-    │             │ SELECT capacity FROM parking_lots       │             │
-    │             │──────────────────────────►│             │             │
+    │◄────────────│ 201 Created │             │             │             │
     │             │             │             │             │             │
-    │             │◄──────────────────────────│             │             │
-    │             │ capacity: 100             │             │             │
+    │             │ ═══════════════════════════════════════════════════════
+    │             │ ║               FAILURE PATH                          ║
+    │             │ ═══════════════════════════════════════════════════════
     │             │             │             │             │             │
-    │             │ COUNT(*) FROM parking_sessions WHERE active           │
-    │             │──────────────────────────────────────────────────────►│
+    │ POST fails  │             │             │             │             │
+    │ (timeout/auth/500)        │             │             │             │
+    │─────────────X             │             │             │             │
     │             │             │             │             │             │
-    │             │◄──────────────────────────────────────────────────────│
-    │             │ count: 45 (under capacity)│             │             │
+    │ Queue to Redis            │             │             │             │
+    │────────────────────────────────────────────────────────►            │
+    │             │             │             │ LPUSH       │             │
+    │             │             │             │ pending_entries           │
+    │◄────────────│             │             │             │ ✓ Queued    │
+    │ "Queued"    │             │             │             │             │
     │             │             │             │             │             │
-    │             │ SELECT * FROM cars WHERE license_plate='ABC123'       │
-    │             │──────────────────────────►│             │             │
+    │             │             │    (every 30 seconds)     │             │
+    │             │             │             │             │◄────────────│
+    │             │             │             │             │ RPOP        │
+    │             │             │             │             │────────────►│
+    │             │             │             │             │ detection   │
     │             │             │             │             │             │
-    │             │◄──────────────────────────│             │             │
-    │             │ {car_id: 5, user_id: 'uuid-123'}        │             │
-    │             │             │             │             │             │
-    │             │ INSERT INTO parking_sessions            │             │
-    │             │ (lot_id, plate, car_id, user_id, status='active')     │
-    │             │──────────────────────────────────────────────────────►│
-    │             │             │             │             │             │
-    │             │◄──────────────────────────────────────────────────────│
-    │             │ session_id: 42            │             │             │
-    │             │             │             │             │             │
-    │             │ mark_plate_seen           │             │             │
-    │             │ (plate, lot_id, TTL=5s)   │             │             │
-    │             │────────────►│             │             │             │
-    │             │             │             │             │             │
-    │             │ invalidate_lot(lot_id)    │             │             │
-    │             │────────────►│             │             │             │
-    │             │             │             │             │             │
-    │◄────────────│             │             │             │             │
-    │ 201 Created │             │             │             │             │
-    │ {session}   │             │             │             │             │
-    │             │             │             │             │             │
+    │             │             │             │◄────────────────────────────
+    │             │             │             │ INSERT (retry)            │
+    │             │             │             │────────────────────────────►
+    │             │             │             │             │ Success!    │
 ```
 
 ### 7.2 Vehicle Exit Flow with Payment
@@ -644,8 +579,6 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
 | POST | `/auth/refresh` | None | Refresh access token |
 | POST | `/auth/logout` | User | Sign out |
 | GET | `/auth/me` | User | Get current user profile |
-| POST | `/auth/password/reset` | None | Request password reset |
-| POST | `/auth/password/update` | User | Update password |
 
 ### Parking Lots (`/lots`)
 | Method | Endpoint | Auth | Description |
@@ -664,22 +597,55 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
 | POST | `/parking/{lot_id}/entry` | Admin | Record vehicle entry |
 | POST | `/parking/{lot_id}/exit` | Admin | Record vehicle exit |
 | POST | `/parking/sessions/{id}/force-checkout` | Admin | Force close session |
-| GET | `/parking/sessions` | Admin | List all sessions |
-| GET | `/parking/my-sessions` | User | List own sessions |
+| GET | `/parking/sessions` | Admin | List all sessions (with details) |
+| GET | `/parking/my-sessions` | User | List own sessions (basic) |
+| GET | `/parking/my-sessions-detailed` | User | List own sessions (with lot/car details) |
 | GET | `/parking/my-active-session` | User | Get current active session |
+
+### Admin (`/admin`)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/admin/users` | Admin | List all users with details |
+| GET | `/admin/users/{id}/sessions` | Admin | Get user's parking history |
+| POST | `/admin/users/{id}/charge` | Admin | Manually charge user |
+| POST | `/admin/users/{id}/top-up` | Admin | Add credit to user |
+| PUT | `/admin/users/{id}/admin-status` | Admin | Grant/revoke admin |
+| GET | `/admin/lots/{id}/active-users` | Admin | Users parked in lot |
+| GET | `/admin/queue/status` | Admin | Get queue lengths + worker stats |
+| GET | `/admin/queue/failed` | Admin | View failed detections |
+| DELETE | `/admin/queue/failed` | Admin | Clear failed detections |
+
+### Cars (`/cars`)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/cars/` | User | Register new car |
+| GET | `/cars/` | User | List own cars |
+| GET | `/cars/{id}` | User | Get car details |
+| PUT | `/cars/{id}` | User | Update car |
+| DELETE | `/cars/{id}` | User | Delete car |
+| POST | `/cars/{id}/primary` | User | Set as primary car |
 
 ---
 
-## 9. Caching Strategy
+## 9. Redis Architecture
 
-### Redis Cache Keys
+### Cache Keys
 
 | Key Pattern | TTL | Purpose | Invalidation Trigger |
 |-------------|-----|---------|---------------------|
-| `lot_status:{lot_id}` | 5 min | Cached occupancy stats | Entry/exit/force-checkout |
-| `active_sessions:{lot_id}` | 5 min | List of active sessions | Entry/exit/force-checkout |
-| `plate_seen:{plate}:{lot_id}` | 5 sec | Duplicate entry prevention | Auto-expire |
-| `user_session:{user_id}` | 5 min | User's active session | Exit/checkout |
+| `lot:{lot_id}:status` | 30s | Cached occupancy stats | Entry/exit/force-checkout |
+| `lot:{lot_id}:active_sessions` | 60s | List of active sessions | Entry/exit/force-checkout |
+| `plate:{plate}:last_seen:{lot_id}` | 5s | Duplicate entry prevention | Auto-expire |
+| `user:{user_id}:active_session` | 4hr | User's current parking session | Exit/checkout |
+| `user:{user_id}:activity` | 5min | User's session history (Activity tab) | Entry/exit |
+
+### Queue Keys
+
+| Key | Purpose | Processor |
+|-----|---------|-----------|
+| `queue:pending_entries` | Failed entry detections awaiting retry | retry_worker |
+| `queue:pending_exits` | Failed exit detections awaiting retry | retry_worker |
+| `queue:failed_detections` | Dead letter queue (exceeded max retries) | Manual review |
 
 ### Cache Flow Diagram
 
@@ -693,7 +659,7 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
                     ▼
            ┌───────────────┐
            │ Check Redis   │
-           │ lot_status:42 │
+           │ lot:42:status │
            └───────┬───────┘
                    │
         ┌──────────┴──────────┐
@@ -704,13 +670,14 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
    ┌─────────┐        ┌─────────────┐
    │ Return  │        │ Query       │
    │ cached  │        │ Supabase    │
-   │ data    │        └──────┬──────┘
-   └─────────┘               │
+   │ (~1ms)  │        │ (~50ms)     │
+   └─────────┘        └──────┬──────┘
+                             │
                              ▼
                       ┌─────────────┐
                       │ Store in    │
                       │ Redis       │
-                      │ TTL = 5min  │
+                      │ TTL = 30s   │
                       └──────┬──────┘
                              │
                              ▼
@@ -726,14 +693,113 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
            │ invalidate_lot()  │
            │                   │
            │ DELETE:           │
-           │ • lot_status:42   │
-           │ • active_sessions │
+           │ • lot:{id}:status │
+           │ • lot:{id}:active │
+           │ • user:{id}:activity
            └───────────────────┘
 ```
 
 ---
 
-## 10. Business Rules
+## 10. Reliability Queue System
+
+### Purpose
+
+The reliability queue ensures no parking detections are lost due to:
+- Network timeouts
+- API server restarts
+- Authentication token expiration
+- Database connection issues
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                        RELIABILITY QUEUE ARCHITECTURE                            │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                         CAMERA (webcam_alpr.py)                          │
+    └─────────────────────────────────┬───────────────────────────────────────┘
+                                      │
+                                      │ Detect plate
+                                      ▼
+                              ┌───────────────┐
+                              │ POST /entry   │
+                              │ or /exit      │
+                              └───────┬───────┘
+                                      │
+                    ┌─────────────────┴─────────────────┐
+                    │ Success                          │ Failure
+                    ▼                                  ▼
+            ┌───────────────┐                 ┌───────────────────┐
+            │ Normal flow   │                 │ Queue to Redis    │
+            │ (Supabase)    │                 │ (LPUSH)           │
+            └───────────────┘                 └─────────┬─────────┘
+                                                        │
+                                                        ▼
+                                              ┌───────────────────┐
+                                              │ pending_entries   │
+                                              │ pending_exits     │
+                                              │ (Redis List)      │
+                                              └─────────┬─────────┘
+                                                        │
+                                                        │ Every 30 seconds
+                                                        ▼
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                     RETRY WORKER (background task)                       │
+    │                                                                          │
+    │   1. RPOP from queue (FIFO)                                             │
+    │   2. Attempt to process detection                                        │
+    │   3. Success → Done                                                      │
+    │   4. Failure → Increment retry_count                                     │
+    │      - retry_count <= 5 → Re-queue (LPUSH)                              │
+    │      - retry_count > 5  → Move to failed_detections (dead letter)       │
+    │                                                                          │
+    └─────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ Exceeded retries
+                                      ▼
+                              ┌───────────────────┐
+                              │ failed_detections │
+                              │ (Dead Letter)     │
+                              └─────────┬─────────┘
+                                        │
+                                        │ Admin reviews via
+                                        │ GET /admin/queue/failed
+                                        ▼
+                              ┌───────────────────┐
+                              │ Manual action or  │
+                              │ DELETE to clear   │
+                              └───────────────────┘
+```
+
+### Queue Data Structure
+
+```json
+// Detection in queue
+{
+  "plate": "ABC123",
+  "confidence": 0.95,
+  "lot_id": 1,
+  "timestamp": "2024-01-03T10:30:00Z",
+  "error_reason": "timeout",
+  "queued_at": "2024-01-03T10:30:01Z",
+  "retry_count": 0
+}
+```
+
+### Configuration
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| Retry Interval | 30 seconds | How often worker checks queues |
+| Max Retries | 5 | Attempts before dead letter |
+| Batch Size | 10 | Items processed per cycle |
+
+---
+
+## 11. Business Rules
 
 ### Billing Rules
 
@@ -769,82 +835,159 @@ The License Plate Recognition (LPR) Parking System is a full-stack application t
 
 ---
 
-## Appendix: File Structure Reference
+## 12. Deployment & Infrastructure
 
-```
-app/
-├── config.py              # Environment configuration
-├── security.py            # JWT verification, auth dependencies
-├── supabase_client.py     # Supabase client singleton
-├── cache.py               # Redis cache manager
-├── webcam_alpr.py         # ALPR camera integration
-└── routers/
-    ├── auth.py            # Authentication endpoints
-    ├── parking.py         # Parking session management
-    ├── parking_lot.py     # Lot CRUD operations
-    ├── car.py             # Vehicle registration
-    └── admin.py           # Admin operations
+### Docker Compose Architecture
 
-frontend/src/
-├── contexts/
-│   ├── AuthContext.tsx    # Auth state management
-│   └── LotContext.tsx     # Lot state management
-├── services/
-│   └── api.ts             # API client with auth
-├── screens/               # UI screens
-├── navigation/            # React Navigation setup
-├── types/                 # TypeScript interfaces
-└── constants/             # App configuration
+```yaml
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    depends_on: [redis]
+    environment:
+      - SUPABASE_URL
+      - SUPABASE_ANON_KEY
+      - SUPABASE_SERVICE_ROLE_KEY
+      - REDIS_URL=redis://redis:6379
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    volumes:
+      - redis_data:/data
 ```
 
----
+### Container Diagram
 
-## Appendix B: Running the ALPR Camera
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              DOCKER DEPLOYMENT                                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-The camera script runs **outside Docker** on the host machine (requires webcam access).
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                           Docker Network                                 │
+    │                                                                          │
+    │   ┌─────────────────────────┐        ┌─────────────────────────┐        │
+    │   │      api (FastAPI)      │        │    redis (Redis 7)      │        │
+    │   │                         │        │                         │        │
+    │   │  • Port 8000            │◄──────►│  • Port 6379            │        │
+    │   │  • Python 3.12          │        │  • Persistence enabled  │        │
+    │   │  • Uvicorn              │        │  • Alpine image         │        │
+    │   │  • Retry Worker         │        │                         │        │
+    │   │                         │        │                         │        │
+    │   └───────────┬─────────────┘        └─────────────────────────┘        │
+    │               │                                                          │
+    └───────────────┼──────────────────────────────────────────────────────────┘
+                    │
+                    │ Port 8000 exposed
+                    ▼
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                          HOST MACHINE                                    │
+    │                                                                          │
+    │   ┌─────────────────────────┐        ┌─────────────────────────┐        │
+    │   │    Mobile App (Expo)    │        │    ALPR Camera          │        │
+    │   │                         │        │    (webcam_alpr.py)     │        │
+    │   │  • http://localhost:8000│        │  • Requires webcam      │        │
+    │   │                         │        │  • Runs outside Docker  │        │
+    │   └─────────────────────────┘        └─────────────────────────┘        │
+    │                                                                          │
+    └─────────────────────────────────────────────────────────────────────────┘
 
-### Installation (Host Machine)
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                        EXTERNAL SERVICES                                 │
+    │                                                                          │
+    │   ┌─────────────────────────────────────────────────────────────────┐   │
+    │   │                    Supabase (Hosted)                             │   │
+    │   │                                                                  │   │
+    │   │  • PostgreSQL Database                                          │   │
+    │   │  • Supabase Auth (JWT)                                          │   │
+    │   │  • Row Level Security                                           │   │
+    │   │                                                                  │   │
+    │   └─────────────────────────────────────────────────────────────────┘   │
+    │                                                                          │
+    └─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Running the System
 
 ```bash
-# Install camera dependencies (OpenCV with GUI)
-pip install -r requirements-camera.txt
-```
+# Start backend services
+docker-compose up -d
 
-### Running the Camera
+# Start mobile app (development)
+cd frontend && bun expo start
 
-```bash
-# Basic usage with authentication
-python -m app.webcam_alpr --email admin@example.com --password secret --lot-id 1
-
-# Entry-only mode (camera at entrance)
-python -m app.webcam_alpr -e admin@example.com -p secret -l 1 --mode entry
-
-# Exit-only mode (camera at exit gate)
-python -m app.webcam_alpr -e admin@example.com -p secret -l 1 --mode exit
-
-# Auto mode (default) - detects entry/exit based on active sessions
-python -m app.webcam_alpr -e admin@example.com -p secret -l 1 --mode auto
+# Start ALPR camera (on host, outside Docker)
+python3 -m app.webcam_alpr \
+  --email admin@example.com \
+  --password yourpassword \
+  --lot-id 1 \
+  --mode entry
 ```
 
 ### Camera CLI Options
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `-e, --email` | Admin email | `$ALPR_ADMIN_EMAIL` |
-| `-p, --password` | Admin password | `$ALPR_ADMIN_PASSWORD` |
+| `-e, --email` | Admin email | Required |
+| `-p, --password` | Admin password | Required |
 | `-l, --lot-id` | Parking lot ID | `1` |
 | `-m, --mode` | `auto`, `entry`, or `exit` | `auto` |
 | `-c, --camera` | Camera device index | `0` |
 | `-u, --api-url` | API base URL | `http://127.0.0.1:8000` |
 | `-C, --confidence` | Min detection confidence | `0.7` |
 
-### Keyboard Controls
+---
 
-| Key | Action |
-|-----|--------|
-| `q` | Quit and end session |
-| `s` | Take screenshot |
+## Appendix: File Structure Reference
+
+```
+License-Plate-Recognition/
+├── app/
+│   ├── config.py              # Environment configuration
+│   ├── security.py            # JWT verification, auth dependencies
+│   ├── supabase_client.py     # Supabase client singleton
+│   ├── cache.py               # Redis cache manager + queues
+│   ├── webcam_alpr.py         # ALPR camera + FastAPI app entry
+│   ├── routers/
+│   │   ├── auth.py            # Authentication endpoints
+│   │   ├── parking.py         # Parking session management
+│   │   ├── parking_lot.py     # Lot CRUD operations
+│   │   ├── car.py             # Vehicle registration
+│   │   ├── admin.py           # Admin + queue monitoring
+│   │   └── user.py            # User profile endpoints
+│   └── workers/
+│       ├── __init__.py
+│       └── retry_worker.py    # Background retry worker
+│
+├── frontend/src/
+│   ├── contexts/
+│   │   ├── AuthContext.tsx    # Auth state management
+│   │   └── LotContext.tsx     # Lot state management
+│   ├── services/
+│   │   └── api.ts             # API client with auth
+│   ├── screens/
+│   │   ├── DashboardScreen.tsx
+│   │   ├── LogScreen.tsx      # Admin: all sessions
+│   │   ├── MyActivityScreen.tsx # User: own sessions
+│   │   ├── SettingsScreen.tsx
+│   │   └── UserManagementScreen.tsx
+│   ├── navigation/
+│   │   └── AppNavigator.tsx   # Role-based navigation
+│   ├── types/
+│   │   └── index.ts           # TypeScript interfaces
+│   └── constants/
+│       └── index.ts           # API URL, storage keys
+│
+├── docker-compose.yml         # Container orchestration
+├── Dockerfile                 # API container build
+├── requirements.txt           # Python dependencies
+├── camera_config.json         # Lot ID mappings for camera
+└── alpr_sessions/             # Local backup files (gitignored)
+```
 
 ---
 
-*Document generated for License Plate Recognition Parking System v1.0*
+*Document Version 2.0 - License Plate Recognition Parking System*
+*Last Updated: January 2026*

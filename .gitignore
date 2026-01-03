@@ -160,3 +160,8 @@ cudnn64_7.dll
 
 # Train folder
 train_val_set/
+
+# ALPR session files (local backups)
+alpr_sessions/
+.claude/
+

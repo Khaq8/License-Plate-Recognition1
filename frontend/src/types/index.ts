@@ -50,6 +50,7 @@ export interface ParkingSession {
   entry_confidence: number | null;
   exit_confidence: number | null;
   amount_charged: number | null;
+  status: 'active' | 'completed';
   is_force_checkout: boolean;
   created_at: string;
   // Extended fields

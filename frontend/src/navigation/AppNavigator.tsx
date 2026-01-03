@@ -10,6 +10,7 @@ import {
   LoginScreen,
   DashboardScreen,
   LogScreen,
+  MyActivityScreen,
   SettingsScreen,
   UserManagementScreen,
   SignupScreen,
@@ -28,6 +29,7 @@ export type AuthStackParamList = {
 
 export type MainTabParamList = {
   Home: undefined;
+  Activity: undefined;
   Log: undefined;
   Users: undefined;
   Settings: undefined;
@@ -41,6 +43,7 @@ const MainTab = createBottomTabNavigator<MainTabParamList>();
 function TabBarIcon({ name, focused }: { name: string; focused: boolean }) {
   const icons: Record<string, string> = {
     Home: '🏠',
+    Activity: '📊',
     Log: '📋',
     Users: '👥',
     Settings: '⚙️',
@@ -101,6 +104,13 @@ function MainNavigator() {
         component={DashboardScreen}
         options={{ tabBarLabel: 'Home' }}
       />
+      {!isAdmin && (
+        <MainTab.Screen
+          name="Activity"
+          component={MyActivityScreen}
+          options={{ tabBarLabel: 'Activity' }}
+        />
+      )}
       {isAdmin && (
         <MainTab.Screen
           name="Log"
